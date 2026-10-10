@@ -1,13 +1,13 @@
-import { useEffect, useRef } from 'react'
-import type { GameDef } from '../lib/games'
+﻿import { useEffect, useRef } from 'react'
+import type { Game } from '../system/library'
 import TileArt from './TileArt'
 import { sfx } from '../lib/sound'
 
 interface Props {
-  games: GameDef[]
+  games: Game[]
   sel: number
   onSelect: (i: number) => void
-  onLaunch?: (game: GameDef) => void
+  onLaunch?: (game: Game) => void
   className?: string
 }
 

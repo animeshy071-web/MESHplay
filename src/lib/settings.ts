@@ -1,18 +1,52 @@
 export type HomeMode = 'crescent' | 'row'
 export type Quality = 'high' | 'balanced' | 'eco'
+export type DisplayMode = 'fullscreen' | 'borderless' | 'windowed'
+export type FilterMode = 'off' | 'crt' | 'lcd' | 'sharp' | 'smooth'
+export type ScreensaverMode = 'off' | 'clock' | 'music' | 'attract'
 
 export interface Settings {
+  // general
   theme: string
   defaultView: HomeMode
   fps: boolean
-  sound: boolean
-  uiVolume: number // 0..100
   bootAnimation: boolean
-  scanlines: boolean
-  smoothScaling: boolean
   reduceMotion: boolean
   quality: Quality
+  adaptiveQuality: boolean
+  // audio
+  sound: boolean
+  uiVolume: number // 0..100
+  gameVolume: number
+  musicVolume: number
+  voiceVolume: number
+  audioOutput: string // device id or 'default'
+  spatialAudio: boolean
+  muteOnBlur: boolean
+  // display
+  displayMode: DisplayMode
+  monitor: string // 'auto' or monitor name
+  targetFps: number // 30 | 60 | 120 | 0 (uncapped)
+  vsync: boolean
+  hdr: boolean
+  scanlines: boolean
+  smoothScaling: boolean
+  filterMode: FilterMode // in-game display filter default
+  // power
+  sleepTimer: number // minutes: 0 = never, 15, 30, 60
+  idleDim: boolean
+  startWithWindows: boolean
+  launchFullscreen: boolean
+  batterySaver: boolean
+  // controller
+  deadzoneL: number // 0..40 (percent)
+  deadzoneR: number
+  rumbleIntensity: number // 0..100
+  autoSwitchInput: boolean
+  // remote & system
   remoteEnabled: boolean
+  screensaverMode: ScreensaverMode
+  screensaverTimeout: number // minutes idle before screensaver
+  pinEnabled: boolean
 }
 
 const KEY = 'meshplay.settings.v1'
@@ -21,14 +55,44 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'violet',
   defaultView: 'row',
   fps: true,
-  sound: true,
-  uiVolume: 60,
   bootAnimation: true,
-  scanlines: true,
-  smoothScaling: false,
   reduceMotion: false,
   quality: 'balanced',
+  adaptiveQuality: true,
+
+  sound: true,
+  uiVolume: 60,
+  gameVolume: 80,
+  musicVolume: 50,
+  voiceVolume: 70,
+  audioOutput: 'default',
+  spatialAudio: false,
+  muteOnBlur: false,
+
+  displayMode: 'windowed',
+  monitor: 'auto',
+  targetFps: 0,
+  vsync: true,
+  hdr: false,
+  scanlines: true,
+  smoothScaling: false,
+  filterMode: 'crt',
+
+  sleepTimer: 0,
+  idleDim: true,
+  startWithWindows: false,
+  launchFullscreen: true,
+  batterySaver: false,
+
+  deadzoneL: 12,
+  deadzoneR: 12,
+  rumbleIntensity: 60,
+  autoSwitchInput: true,
+
   remoteEnabled: true,
+  screensaverMode: 'clock',
+  screensaverTimeout: 3,
+  pinEnabled: false,
 }
 
 export function loadSettings(): Settings {

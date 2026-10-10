@@ -116,16 +116,42 @@ class RemoteHost {
     }, 2000)
   }
 
-  private handle(msg: { type: string; players?: number[]; action?: string; code?: string }): void {
+  private handle(msg: { type: string; players?: number[]; action?: string; code?: string; lx?: number; ly?: number; rx?: number; ry?: number; lt?: number; rt?: number; dx?: number; dy?: number; button?: string }): void {
     if (msg.type === 'players' && Array.isArray(msg.players)) {
       this.emit({ players: msg.players })
       return
     }
     if (msg.type === 'input' && msg.code && (msg.action === 'down' || msg.action === 'up')) {
       const down = msg.action === 'down'
+      // Guide button: opens the in-game Game Bar
+      if (msg.code === 'Guide') {
+        window.dispatchEvent(new CustomEvent('meshplay:gamebar-toggle', { detail: { source: 'phone-guide' } }))
+        return
+      }
       window.dispatchEvent(
         new KeyboardEvent(down ? 'keydown' : 'keyup', { code: msg.code, key: msg.code, bubbles: true, cancelable: true }),
       )
+      return
+    }
+    if (msg.type === 'axes') {
+      // phone analog sticks + triggers feed the universal input layer
+      void import('../system/input').then(({ setPhoneAxes }) => {
+        setPhoneAxes([msg.lx ?? 0, msg.ly ?? 0, msg.rx ?? 0, msg.ry ?? 0])
+      })
+      return
+    }
+    if (msg.type === 'mouse' && typeof msg.dx === 'number' && typeof msg.dy === 'number') {
+      // trackpad mode: real OS cursor movement (Tauri SendInput)
+      void import('../system/ipc').then(({ tryInvoke }) => {
+        void tryInvoke('send_mouse_move', { dx: msg.dx, dy: msg.dy })
+      })
+      return
+    }
+    if (msg.type === 'click' && msg.button) {
+      void import('../system/ipc').then(({ tryInvoke }) => {
+        void tryInvoke('send_mouse_click', { button: msg.button })
+      })
+      return
     }
   }
 

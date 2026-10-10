@@ -5,12 +5,50 @@ interface Props {
   icon?: string
   className?: string
   isCircular?: boolean
+  artPath?: string // custom art: data URL or native file path (loaded via read_art)
+  artMime?: string
 }
 
+import { useEffect, useState } from 'react'
+import { tryInvoke } from '../system/ipc'
+
 // Procedural box art & game badge emblems — bespoke graphics for each title.
-export default function TileArt({ colors, title, id, icon, className = '', isCircular = false }: Props) {
+// Games with attached custom art render the real image instead.
+export default function TileArt({ colors, title, id, icon, className = '', isCircular = false, artPath, artMime }: Props) {
   const normId = (id || title).toLowerCase().replace(/[^a-z0-9]/g, '')
   const initial = icon ?? title.charAt(0).toUpperCase()
+  const [art, setArt] = useState<string | null>(
+    artPath?.startsWith('data:') ? artPath : null,
+  )
+
+  useEffect(() => {
+    let dead = false
+    if (artPath?.startsWith('data:')) {
+      setArt(artPath)
+      return
+    }
+    if (artPath && !artPath.startsWith('http') && !artPath.startsWith('roms/')) {
+      setArt(null)
+      void (async () => {
+        const res = await tryInvoke<{ dataUrl: string }>('read_art', { path: artPath })
+        if (!dead && res) setArt(res.dataUrl)
+      })()
+    }
+    return () => {
+      dead = true
+    }
+  }, [artPath])
+
+  if (art) {
+    return (
+      <img
+        src={art}
+        alt={title}
+        className={`${className} ${isCircular ? 'rounded-full aspect-square object-cover' : 'object-cover'}`}
+        draggable={false}
+      />
+    )
+  }
 
   const renderGraphic = () => {
     if (icon) {

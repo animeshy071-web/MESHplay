@@ -52,6 +52,28 @@ export function startRemoteServer(port = 8765) {
         res.end(html)
         return
       }
+      if (url.pathname === '/manifest.webmanifest') {
+        const m = await readFile(path.join(process.cwd(), 'public', 'remote', 'manifest.webmanifest'))
+        res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-store' })
+        res.end(m)
+        return
+      }
+      if (url.pathname === '/sw.js') {
+        const sw = await readFile(path.join(process.cwd(), 'public', 'remote', 'sw.js'))
+        res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' })
+        res.end(sw)
+        return
+      }
+      // PWA icons
+      if (url.pathname.startsWith('/icons/')) {
+        const file = path.join(process.cwd(), 'public', 'remote', url.pathname)
+        const icon = await readFile(file).catch(() => null)
+        if (icon) {
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600' })
+          res.end(icon)
+          return
+        }
+      }
       json(res, 404, { ok: false })
     } catch {
       json(res, 500, { ok: false })

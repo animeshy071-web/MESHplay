@@ -1,13 +1,13 @@
-import { useState, useRef } from 'react'
-import type { GameDef } from '../lib/games'
+﻿import { useState, useRef } from 'react'
+import type { Game } from '../system/library'
 import TileArt from './TileArt'
 import { sfx } from '../lib/sound'
 
 interface Props {
-  games: GameDef[]
+  games: Game[]
   sel: number
   onSelect: (i: number) => void
-  onLaunch: (game: GameDef) => void
+  onLaunch: (game: Game) => void
   onPrev?: () => void
   onNext?: () => void
   onOpenSettings?: () => void
@@ -182,16 +182,16 @@ export default function OrbitalCrescent({
             {/* Hover option badge */}
             <div className="pointer-events-none absolute left-[85%] top-1/2 -translate-y-1/2 z-40 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
               <div className="glass-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-white shadow-lg whitespace-nowrap border border-white/20">
-                <span>{isRotating ? '⏸' : '▶'}</span>
+                <span>{isRotating ? 'â¸' : 'â–¶'}</span>
                 <span>{isRotating ? 'Click to Pause' : 'Click to Rotate'}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* ─────────────────────────────────────────────────────────────
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             CRESCENT ARC ARROW CHEVRONS: Ultra-sleek Glass Controls
-            ───────────────────────────────────────────────────────────── */}
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         {/* Up Arrow Button (Flanking Above Middle Selector) */}
         <button
@@ -281,9 +281,9 @@ export default function OrbitalCrescent({
           </svg>
         </button>
 
-        {/* ─────────────────────────────────────────────────────────────
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             CRESCENT ARC GAMES: Side Icons Faded & Small, Middle Big & White
-            ───────────────────────────────────────────────────────────── */}
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {visibleSlots.map(({ k, game, gameIndex }) => {
           if (!game) return null
           const isMiddle = k === 0
@@ -360,12 +360,12 @@ export default function OrbitalCrescent({
                 )}
               </div>
 
-              {/* Middle Main Selection Badge on Hover — Open App */}
+              {/* Middle Main Selection Badge on Hover â€” Open App */}
               {isMiddle && (
                 <div className="pointer-events-none absolute left-full ml-4 opacity-0 group-hover/mid:opacity-100 transition-all duration-300 translate-x-3 group-hover/mid:translate-x-0 whitespace-nowrap z-50">
                   <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white text-black font-black text-xs shadow-[0_0_35px_rgba(255,255,255,0.95)] border border-white">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black text-white text-[10px]">
-                      ▶
+                      â–¶
                     </span>
                     <span className="tracking-wider uppercase">Open {game.title}</span>
                     <span className="text-[10px] font-bold text-black/60 bg-black/10 px-1.5 py-0.5 rounded">

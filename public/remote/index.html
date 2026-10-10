@@ -3,14 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0714" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="mobile-web-app-capable" content="yes" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/pwa-192.png" />
+<link rel="apple-touch-icon" href="icons/pwa-192.png" />
 <title>MESHplay Remote</title>
 <style>
   :root {
     --acc: #a855f7; --acc2: #7c3aed;
     --glass: rgba(255,255,255,0.07);
     --edge: rgba(255,255,255,0.10);
+    --scale: 1;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -22,30 +28,38 @@
   }
   .wrap {
     height: 100%; display: flex; flex-direction: column;
-    padding: max(14px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    padding: max(10px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
   }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 12px; }
-  .brand { display: flex; align-items: center; gap: 9px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 8px; }
+  .brand { display: flex; align-items: center; gap: 8px; }
   .logo {
-    width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+    width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center;
     background: linear-gradient(135deg, var(--acc), var(--acc2));
-    font-weight: 800; font-size: 17px;
+    font-weight: 800; font-size: 15px;
     box-shadow: 0 0 22px -4px var(--acc);
   }
-  .brand b { font-size: 16px; font-weight: 800; letter-spacing: 0.01em; }
+  .brand b { font-size: 14px; font-weight: 800; }
   .brand span { color: var(--acc); }
   .status {
     display: flex; align-items: center; gap: 7px;
     background: var(--glass); border: 1px solid var(--edge);
-    padding: 7px 13px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600;
   }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #f43f5e; transition: background 0.3s; }
   .dot.on { background: #34d399; box-shadow: 0 0 10px #34d399; }
 
-  .stage { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; }
-  .shoulders { display: flex; justify-content: space-between; padding: 0 6px; }
-  .main { display: flex; align-items: center; justify-content: space-between; }
-  .center { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  /* mode switcher */
+  .modes { display: flex; gap: 6px; justify-content: center; padding-bottom: 8px; }
+  .mode {
+    padding: 7px 14px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--glass); border: 1px solid var(--edge); color: rgba(255,255,255,0.55);
+  }
+  .mode.on { background: rgba(168,85,247,0.28); color: #fff; border-color: rgba(168,85,247,0.5); box-shadow: 0 0 20px -8px var(--acc); }
+
+  .stage { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .layout { flex: 1; display: none; flex-direction: column; justify-content: space-evenly; }
+  .layout.on { display: flex; }
 
   .btn {
     display: grid; place-items: center;
@@ -60,39 +74,117 @@
     background: rgba(168, 85, 247, 0.35);
     box-shadow: 0 0 26px -4px var(--acc);
   }
-  .dpad { position: relative; width: 168px; height: 168px; }
-  .dpad .btn { position: absolute; width: 58px; height: 58px; font-size: 19px; }
-  .dpad .up    { left: 55px; top: 0; }
-  .dpad .down  { left: 55px; bottom: 0; }
-  .dpad .left  { left: 0; top: 55px; }
-  .dpad .right { right: 0; top: 55px; }
-  .dpad .mid {
-    left: 55px; top: 55px; width: 58px; height: 58px;
-    background: transparent; border: 1px dashed rgba(255,255,255,0.12); pointer-events: none;
-  }
-  .abxy { position: relative; width: 176px; height: 176px; }
-  .abxy .btn { position: absolute; width: 62px; height: 62px; font-size: 17px; }
-  .abxy .a { right: 0; top: 57px; color: #86efac; }
-  .abxy .b { right: 57px; bottom: 0; color: #fda4af; }
-  .abxy .x { left: 57px; top: 0; color: #93c5fd; }
-  .abxy .y { left: 0; top: 57px; color: #fcd34d; }
-  .lb, .rb { width: 84px; height: 42px; border-radius: 999px; font-size: 13px; letter-spacing: 0.06em; }
+  .dpad { position: relative; width: calc(168px * var(--scale)); height: calc(168px * var(--scale)); }
+  .dpad .btn { position: absolute; width: calc(58px * var(--scale)); height: calc(58px * var(--scale)); font-size: calc(19px * var(--scale)); }
+  .dpad .up    { left: calc(55px * var(--scale)); top: 0; }
+  .dpad .down  { left: calc(55px * var(--scale)); bottom: 0; }
+  .dpad .left  { left: 0; top: calc(55px * var(--scale)); }
+  .dpad .right { right: 0; top: calc(55px * var(--scale)); }
+  .abxy { position: relative; width: calc(176px * var(--scale)); height: calc(176px * var(--scale)); }
+  .abxy .btn { position: absolute; width: calc(62px * var(--scale)); height: calc(62px * var(--scale)); font-size: calc(17px * var(--scale)); }
+  .abxy .a { right: 0; top: calc(57px * var(--scale)); color: #86efac; }
+  .abxy .b { right: calc(57px * var(--scale)); bottom: 0; color: #fda4af; }
+  .abxy .x { left: calc(57px * var(--scale)); top: 0; color: #93c5fd; }
+  .abxy .y { left: 0; top: calc(57px * var(--scale)); color: #fcd34d; }
+  .lb, .rb, .lt, .rt { width: calc(84px * var(--scale)); height: calc(40px * var(--scale)); border-radius: 999px; font-size: calc(13px * var(--scale)); letter-spacing: 0.06em; }
   .pill {
-    height: 34px; padding: 0 18px; border-radius: 999px; font-size: 11px; font-weight: 700;
-    letter-spacing: 0.14em; text-transform: uppercase;
+    height: 32px; padding: 0 16px; border-radius: 999px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
   }
-  .gyro {
-    height: 38px; padding: 0 16px; border-radius: 999px; font-size: 12px; font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-  .gyro.on { background: rgba(52, 211, 153, 0.25); box-shadow: 0 0 20px -6px #34d399; border-color: rgba(52,211,153,0.5); }
   .player {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
     color: rgba(255,255,255,0.5);
   }
+  .main { display: flex; align-items: center; justify-content: space-between; }
+  .center { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+  /* analog sticks */
+  .stick {
+    position: relative; width: calc(128px * var(--scale)); height: calc(128px * var(--scale));
+    border-radius: 50%; background: var(--glass); border: 1px solid var(--edge);
+    display: grid; place-items: center; touch-action: none;
+  }
+  .stick .nub {
+    position: absolute; width: 42%; height: 42%; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(168,85,247,0.55), rgba(124,58,237,0.45));
+    border: 1px solid rgba(255,255,255,0.25);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+    left: 29%; top: 29%; will-change: transform;
+  }
+  .stick.l3 { border-color: rgba(168,85,247,0.6); box-shadow: 0 0 22px -6px var(--acc); }
+  .stick .label { position: absolute; bottom: 6%; font-size: 9px; letter-spacing: 0.15em; color: rgba(255,255,255,0.35); font-weight: 700; }
+  .strow { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
+
+  /* triggers row */
+  .trig { display: flex; justify-content: space-between; padding: 0 4px; }
+  .lt, .rt { width: calc(96px * var(--scale)); }
+
+  /* wheel mode */
+  .wheelwrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .wheel {
+    width: calc(240px * var(--scale)); height: calc(240px * var(--scale)); border-radius: 50%;
+    border: 14px solid rgba(255,255,255,0.14);
+    border-top-color: var(--acc); border-bottom-color: var(--acc);
+    display: grid; place-items: center; touch-action: none;
+    box-shadow: inset 0 0 40px rgba(168,85,247,0.15), 0 10px 40px rgba(0,0,0,0.5);
+    position: relative; will-change: transform;
+  }
+  .wheel .deg { font-size: 26px; font-weight: 800; opacity: 0.85; }
+  .pedals { display: flex; gap: 16px; align-items: flex-end; }
+  .pedal {
+    width: calc(92px * var(--scale)); height: calc(64px * var(--scale));
+    border-radius: 18px; display: grid; place-items: center;
+    background: var(--glass); border: 1px solid var(--edge); font-size: 12px; font-weight: 800; letter-spacing: 0.1em;
+    touch-action: none;
+  }
+  .pedal.gas { height: calc(78px * var(--scale)); color: #86efac; }
+  .pedal.brake { color: #fda4af; }
+  .paddles { display: flex; justify-content: space-between; width: 100%; padding: 0 10px; }
+  .paddle { width: calc(64px * var(--scale)); height: calc(44px * var(--scale)); border-radius: 12px; font-size: 11px; font-weight: 800; }
+  .gyro {
+    height: 34px; padding: 0 16px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em; display: grid; place-items: center;
+    background: var(--glass); border: 1px solid var(--edge);
+  }
+  .gyro.on { background: rgba(52, 211, 153, 0.25); box-shadow: 0 0 20px -6px #34d399; border-color: rgba(52,211,153,0.5); }
+
+  /* fightstick */
+  .fight { display: flex; align-items: center; justify-content: space-evenly; }
+  .fbtns { display: grid; grid-template-columns: repeat(3, calc(64px * var(--scale))); gap: 12px; }
+  .fbtns .btn { width: calc(64px * var(--scale)); height: calc(64px * var(--scale)); font-size: calc(15px * var(--scale)); }
+
+  /* trackpad */
+  .pad {
+    flex: 1; margin: 10px 0; border-radius: 24px;
+    background: var(--glass); border: 1px solid var(--edge);
+    position: relative; touch-action: none; overflow: hidden;
+  }
+  .pad .hint {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: rgba(255,255,255,0.25); font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 700;
+    pointer-events: none;
+  }
+  .padrow { display: flex; gap: 12px; justify-content: center; }
+  .padrow .btn { width: calc(96px * var(--scale)); height: calc(52px * var(--scale)); border-radius: 16px; font-size: 11px; letter-spacing: 0.08em; }
+
+  /* settings sheet */
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: -100%; z-index: 20;
+    background: rgba(11,7,20,0.96); backdrop-filter: blur(18px);
+    border-top: 1px solid var(--edge); border-radius: 24px 24px 0 0;
+    padding: 18px 22px max(20px, env(safe-area-inset-bottom));
+    transition: bottom 0.28s cubic-bezier(0.32, 0.72, 0.25, 1);
+  }
+  .sheet.open { bottom: 0; }
+  .sheet h3 { margin: 0 0 14px; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+  .sheet label { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); }
+  .sheet input[type="range"] { width: 170px; accent-color: var(--acc); }
+  .close { position: absolute; right: 16px; top: 14px; font-size: 13px; color: rgba(255,255,255,0.5); background: var(--glass); border: 1px solid var(--edge); border-radius: 999px; padding: 6px 12px; }
+  .gear { width: 36px; height: 36px; border-radius: 50%; font-size: 15px; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--edge); }
+
   .overlay {
-    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
-    background: rgba(5,3,8,0.82); backdrop-filter: blur(14px); text-align: center; padding: 30px;
+    position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
+    background: rgba(5,3,8,0.85); backdrop-filter: blur(14px); text-align: center; padding: 30px;
   }
   .overlay h2 { font-size: 21px; font-weight: 800; margin: 0 0 8px; }
   .overlay p { font-size: 13px; color: rgba(255,255,255,0.55); margin: 0; line-height: 1.6; }
@@ -103,39 +195,118 @@
 <div class="wrap">
   <header>
     <div class="brand"><div class="logo">M</div><b>MESH<span>play</span></b></div>
-    <div class="status"><div class="dot" id="dot"></div><span id="statusText">Connecting…</span></div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="status"><div class="dot" id="dot"></div><span id="statusText">Connecting…</span></div>
+      <div class="gear" id="gearBtn">⚙</div>
+    </div>
   </header>
 
+  <div class="modes">
+    <div class="mode on" data-mode="gamepad">Gamepad</div>
+    <div class="mode" data-mode="wheel">Wheel</div>
+    <div class="mode" data-mode="fight">Fight</div>
+    <div class="mode" data-mode="trackpad">Trackpad</div>
+  </div>
+
   <div class="stage">
-    <div class="shoulders">
-      <div class="btn lb" data-code="ArrowLeft">LB</div>
-      <div class="btn rb" data-code="ArrowRight">RB</div>
+    <!-- GAMEPAD -->
+    <div class="layout on" id="layout-gamepad">
+      <div class="trig">
+        <div class="btn lt" id="ltBtn">L2</div>
+        <div class="btn rt" id="rtBtn">R2</div>
+      </div>
+      <div class="shoulders" style="display:flex; justify-content:space-between; padding:0 4px;">
+        <div class="btn lb" data-code="ArrowLeft">L1</div>
+        <div class="btn rb" data-code="ArrowRight">R1</div>
+      </div>
+      <div class="main">
+        <div class="dpad">
+          <div class="btn up" data-code="ArrowUp">▲</div>
+          <div class="btn left" data-code="ArrowLeft">◀</div>
+          <div class="btn right" data-code="ArrowRight">▶</div>
+          <div class="btn down" data-code="ArrowDown">▼</div>
+        </div>
+
+        <div class="center">
+          <div class="player" id="playerBadge">—</div>
+          <div class="btn pill" data-code="ShiftLeft">Select</div>
+          <div class="btn pill" data-code="Enter">Start</div>
+          <div class="btn pill" id="guideBtn" style="border-color: rgba(168,85,247,0.5);">⌂ Guide</div>
+        </div>
+
+        <div class="abxy">
+          <div class="btn x" data-code="KeyX">X</div>
+          <div class="btn y" data-code="Tab">Y</div>
+          <div class="btn a" data-code="Enter">A</div>
+          <div class="btn b" data-code="Escape">B</div>
+        </div>
+      </div>
+      <div class="strow">
+        <div class="stick" id="stickL"><div class="nub"></div><div class="label">L3 = TAP</div></div>
+        <div style="flex:1"></div>
+        <div class="stick" id="stickR"><div class="nub"></div><div class="label">R3 = TAP</div></div>
+      </div>
     </div>
 
-    <div class="main">
-      <div class="dpad">
-        <div class="btn up" data-code="ArrowUp">▲</div>
-        <div class="btn left" data-code="ArrowLeft">◀</div>
-        <div class="btn mid"></div>
-        <div class="btn right" data-code="ArrowRight">▶</div>
-        <div class="btn down" data-code="ArrowDown">▼</div>
+    <!-- WHEEL -->
+    <div class="layout" id="layout-wheel">
+      <div class="wheelwrap">
+        <div class="gyro" id="gyroBtn">Enable Gyro Steering</div>
+        <div class="wheel" id="wheel"><div class="deg" id="wheelDeg">0°</div></div>
       </div>
-
-      <div class="center">
-        <div class="player" id="playerBadge">—</div>
-        <div class="btn pill" data-code="Tab">View</div>
-        <div class="btn pill" data-code="Escape">Menu</div>
-        <div class="btn gyro" id="gyroBtn">Gyro Off</div>
+      <div class="paddles">
+        <div class="btn paddle" data-code="PageDown">− DOWN</div>
+        <div class="btn paddle" data-code="PageUp">+ UP</div>
       </div>
+      <div class="pedals">
+        <div class="pedal brake" id="brakePedal">BRAKE</div>
+        <div class="pedal gas" id="gasPedal">GAS</div>
+      </div>
+    </div>
 
-      <div class="abxy">
-        <div class="btn x" data-code="KeyX">X</div>
-        <div class="btn y" data-code="Tab">Y</div>
-        <div class="btn a" data-code="Enter">A</div>
-        <div class="btn b" data-code="Escape">B</div>
+    <!-- FIGHTSTICK -->
+    <div class="layout" id="layout-fight">
+      <div class="fight">
+        <div class="dpad">
+          <div class="btn up" data-code="ArrowUp">▲</div>
+          <div class="btn left" data-code="ArrowLeft">◀</div>
+          <div class="btn right" data-code="ArrowRight">▶</div>
+          <div class="btn down" data-code="ArrowDown">▼</div>
+        </div>
+        <div class="fbtns">
+          <div class="btn" data-code="KeyU" style="color:#fcd34d">LP</div>
+          <div class="btn" data-code="KeyI" style="color:#fcd34d">HP</div>
+          <div class="btn" data-code="KeyO" style="color:#fcd34d">LK</div>
+          <div class="btn" data-code="KeyJ" style="color:#86efac">MP</div>
+          <div class="btn" data-code="KeyK" style="color:#86efac">HK</div>
+          <div class="btn" data-code="KeyL" style="color:#fda4af">3P</div>
+        </div>
+      </div>
+      <div class="center" style="flex-direction:row; justify-content:center; gap:12px;">
+        <div class="btn pill" data-code="ShiftLeft">Select</div>
+        <div class="btn pill" data-code="Enter">Start</div>
+      </div>
+    </div>
+
+    <!-- TRACKPAD -->
+    <div class="layout" id="layout-trackpad">
+      <div class="pad" id="pad"><div class="hint">Slide to move · Tap = click · Two fingers = right</div></div>
+      <div class="padrow">
+        <div class="btn" id="padLeft">Left Click</div>
+        <div class="btn" id="padRight">Right Click</div>
       </div>
     </div>
   </div>
+</div>
+
+<!-- settings sheet -->
+<div class="sheet" id="sheet">
+  <button class="close" id="sheetClose">Done</button>
+  <h3>Controller settings</h3>
+  <label>Haptics intensity <input type="range" id="hapticsRange" min="0" max="100" value="70" /></label>
+  <label>Button scale <input type="range" id="scaleRange" min="80" max="130" value="100" /></label>
+  <label>Gyro steering <input type="checkbox" id="gyroCheckbox" style="accent-color: var(--acc); width: 20px; height: 20px;" /></label>
+  <label style="color: rgba(255,255,255,0.45); font-size: 11px;">MESHplay Remote — 100% offline over local Wi-Fi, hotspot, or USB tethering. Installable app.</label>
 </div>
 
 <div class="overlay" id="connectOverlay">
@@ -151,8 +322,9 @@
   var token = params.get('t') || ''
   var ws = null
   var retryT = null
-  var gyroOn = false
-  var gyroState = { left: false, right: false }
+  var haptics = 0.7 // 0..1
+  var mode = 'gamepad'
+  var player = 1
 
   var dot = document.getElementById('dot')
   var statusText = document.getElementById('statusText')
@@ -161,7 +333,9 @@
   var ovTitle = document.getElementById('ovTitle')
   var ovText = document.getElementById('ovText')
 
-  function buzz(ms) { if (navigator.vibrate) navigator.vibrate(ms || 8) }
+  function buzz(ms) {
+    if (navigator.vibrate) navigator.vibrate(Math.round((ms || 8) * (0.3 + haptics)))
+  }
 
   function setStatus(on, text) {
     dot.classList.toggle('on', on)
@@ -184,6 +358,7 @@
       try {
         var m = JSON.parse(ev.data)
         if (m.type === 'welcome') {
+          player = m.player
           playerBadge.textContent = 'Player ' + m.player
           buzz(20)
         } else if (m.type === 'rumble') {
@@ -210,7 +385,20 @@
     ws.onerror = function () { try { ws.close() } catch (e) {} }
   }
 
-  // ---- button input ----
+  // ---- mode switching ----
+  document.querySelectorAll('.mode').forEach(function (el) {
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      document.querySelectorAll('.mode').forEach(function (m) { m.classList.remove('on') })
+      el.classList.add('on')
+      mode = el.getAttribute('data-mode')
+      document.querySelectorAll('.layout').forEach(function (l) { l.classList.remove('on') })
+      document.getElementById('layout-' + mode).classList.add('on')
+      buzz(10)
+    })
+  })
+
+  // ---- digital buttons ----
   function down(el, code) {
     el.classList.add('press')
     buzz(8)
@@ -220,7 +408,6 @@
     el.classList.remove('press')
     send({ type: 'input', action: 'up', code: code })
   }
-
   document.querySelectorAll('.btn[data-code]').forEach(function (el) {
     var code = el.getAttribute('data-code')
     el.addEventListener('pointerdown', function (e) {
@@ -233,63 +420,234 @@
     el.addEventListener('contextmenu', function (e) { e.preventDefault() })
   })
 
-  // ---- gyro steering ----
-  var gyroBtn = document.getElementById('gyroBtn')
-  gyroBtn.addEventListener('pointerdown', function (e) {
+  // ---- Guide button: opens the MESHplay Game Bar ----
+  var guideBtn = document.getElementById('guideBtn')
+  guideBtn.addEventListener('pointerdown', function (e) {
     e.preventDefault()
-    if (!gyroOn) {
-      var enable = function () {
-        gyroOn = true
-        gyroBtn.classList.add('on')
-        gyroBtn.textContent = 'Gyro On'
-        window.addEventListener('deviceorientation', onTilt, true)
-      }
-      if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
-        DeviceOrientationEvent.requestPermission().then(function (r) { if (r === 'granted') enable() }).catch(function () {})
-      } else if ('DeviceOrientationEvent' in window) {
-        enable()
-      }
-    } else {
-      gyroOn = false
-      gyroBtn.classList.remove('on')
-      gyroBtn.textContent = 'Gyro Off'
-      window.removeEventListener('deviceorientation', onTilt, true)
-      if (gyroState.left) { gyroState.left = false; send({ type: 'input', action: 'up', code: 'ArrowLeft' }) }
-      if (gyroState.right) { gyroState.right = false; send({ type: 'input', action: 'up', code: 'ArrowRight' }) }
-    }
+    guideBtn.classList.add('press')
+    buzz(24)
+    send({ type: 'input', action: 'down', code: 'Guide' })
+  })
+  guideBtn.addEventListener('pointerup', function () {
+    guideBtn.classList.remove('press')
+    send({ type: 'input', action: 'up', code: 'Guide' })
   })
 
+  // ---- analog sticks ----
+  function makeStick(el, which) {
+    var nub = el.querySelector('.nub')
+    var activeId = null
+    var cx = 0, cy = 0
+    var l3Armed = true
+    function setAxes(dx, dy) {
+      var r = el.clientWidth / 2
+      var nx = Math.max(-1, Math.min(1, dx / r))
+      var ny = Math.max(-1, Math.min(1, dy / r))
+      nub.style.transform = 'translate(' + (nx * r * 0.55) + 'px,' + (ny * r * 0.55) + 'px)'
+      axes[which] = [nx, ny]
+      pushAxes()
+    }
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      activeId = e.pointerId
+      el.setPointerCapture(e.pointerId)
+      var rect = el.getBoundingClientRect()
+      cx = rect.left + rect.width / 2
+      cy = rect.top + rect.height / 2
+      // L3/R3: quick tap (no move)
+      l3Armed = true
+      setTimeout(function () { l3Armed = false }, 220)
+      setAxes(e.clientX - cx, e.clientY - cy)
+    })
+    el.addEventListener('pointermove', function (e) {
+      if (activeId !== e.pointerId) return
+      setAxes(e.clientX - cx, e.clientY - cy)
+    })
+    function release(e) {
+      if (activeId !== e.pointerId) return
+      activeId = null
+      if (l3Armed) {
+        // tap = L3/R3 click → mapped to Select/Enter for UI nav
+        buzz(14)
+        send({ type: 'input', action: 'down', code: which === 'lx' ? 'ShiftLeft' : 'ControlLeft' })
+        setTimeout(function () { send({ type: 'input', action: 'up', code: which === 'lx' ? 'ShiftLeft' : 'ControlLeft' }) }, 90)
+      }
+      setAxes(0, 0)
+    }
+    el.addEventListener('pointerup', release)
+    el.addEventListener('pointercancel', release)
+    el.addEventListener('contextmenu', function (e) { e.preventDefault() })
+  }
+  var axes = { lx: [0, 0], rx: [0, 0] }
+  var ltVal = 0, rtVal = 0
+  makeStick(document.getElementById('stickL'), 'lx')
+  makeStick(document.getElementById('stickR'), 'rx')
+
+  var lastAxesStr = ''
+  function pushAxes() {
+    var a = axes
+    var str = [a.lx[0], a.lx[1], a.rx[0], a.rx[1], ltVal, rtVal].map(function (v) { return v.toFixed(2) }).join(',')
+    if (str === lastAxesStr) return
+    lastAxesStr = str
+    send({ type: 'axes', lx: a.lx[0], ly: a.lx[1], rx: a.rx[0], ry: a.rx[1], lt: ltVal, rt: rtVal })
+  }
+  setInterval(pushAxes, 16) // ~60Hz analog stream
+
+  // analog triggers (L2/R2): pressure ramps while held
+  function makeTrigger(el, setVal) {
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      el.classList.add('press')
+      setVal(1)
+      buzz(8)
+    })
+    function rel() {
+      el.classList.remove('press')
+      setVal(0)
+    }
+    el.addEventListener('pointerup', rel)
+    el.addEventListener('pointercancel', rel)
+  }
+  makeTrigger(document.getElementById('ltBtn'), function (v) { ltVal = v })
+  makeTrigger(document.getElementById('rtBtn'), function (v) { rtVal = v })
+
+  // ---- wheel mode ----
+  var gyroOn = false
+  var gyroBtn = document.getElementById('gyroBtn')
+  var gyroCheckbox = document.getElementById('gyroCheckbox')
+  var wheelEl = document.getElementById('wheel')
+  var wheelDegEl = document.getElementById('wheelDeg')
+  function enableGyro() {
+    var go = function () {
+      gyroOn = true
+      gyroBtn.classList.add('on')
+      gyroBtn.textContent = 'Gyro Steering On'
+      gyroCheckbox.checked = true
+      window.addEventListener('deviceorientation', onTilt, true)
+    }
+    if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
+      DeviceOrientationEvent.requestPermission().then(function (r) { if (r === 'granted') go() }).catch(function () {})
+    } else if ('DeviceOrientationEvent' in window) {
+      go()
+    }
+  }
+  function disableGyro() {
+    gyroOn = false
+    gyroBtn.classList.remove('on')
+    gyroBtn.textContent = 'Enable Gyro Steering'
+    gyroCheckbox.checked = false
+    window.removeEventListener('deviceorientation', onTilt, true)
+    wheelEl.style.transform = 'rotate(0deg)'
+    wheelDegEl.textContent = '0°'
+    axes.lx = [0, 0]
+    pushAxes()
+  }
+  gyroBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault()
+    if (gyroOn) disableGyro(); else enableGyro()
+  })
+  gyroCheckbox.addEventListener('change', function () {
+    if (gyroCheckbox.checked) enableGyro(); else disableGyro()
+  })
   function onTilt(ev) {
     if (!gyroOn) return
-    var g = ev.gamma || 0 // left/right tilt degrees
-    var wantLeft = g < -14
-    var wantRight = g > 14
-    if (wantLeft !== gyroState.left) {
-      gyroState.left = wantLeft
-      send({ type: 'input', action: wantLeft ? 'down' : 'up', code: 'ArrowLeft' })
-    }
-    if (wantRight !== gyroState.right) {
-      gyroState.right = wantRight
-      send({ type: 'input', action: wantRight ? 'down' : 'up', code: 'ArrowRight' })
-    }
+    var g = Math.max(-45, Math.min(45, ev.gamma || 0))
+    wheelEl.style.transform = 'rotate(' + (-g) + 'deg)'
+    wheelDegEl.textContent = Math.round(g) + '°'
+    // analog steering via left stick X
+    axes.lx = [Math.max(-1, Math.min(1, g / 30)), 0]
+    pushAxes()
     send({ type: 'gyro', gamma: g, beta: ev.beta || 0 })
   }
 
+  function makePedal(el, code) {
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      el.classList.add('press')
+      buzz(10)
+      send({ type: 'input', action: 'down', code: code })
+    })
+    function rel() {
+      el.classList.remove('press')
+      send({ type: 'input', action: 'up', code: code })
+    }
+    el.addEventListener('pointerup', rel)
+    el.addEventListener('pointercancel', rel)
+  }
+  makePedal(document.getElementById('gasPedal'), 'ArrowUp')
+  makePedal(document.getElementById('brakePedal'), 'ArrowDown')
+
+  // ---- trackpad / mouse mode ----
+  var pad = document.getElementById('pad')
+  var pointers = {}
+  pad.addEventListener('pointerdown', function (e) {
+    e.preventDefault()
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY, moved: false }
+    pad.setPointerCapture(e.pointerId)
+  })
+  pad.addEventListener('pointermove', function (e) {
+    var p = pointers[e.pointerId]
+    if (!p) return
+    var dx = e.clientX - p.x
+    var dy = e.clientY - p.y
+    if (Math.abs(dx) + Math.abs(dy) > 2) p.moved = true
+    p.x = e.clientX
+    p.y = e.clientY
+    send({ type: 'mouse', dx: Math.round(dx * 1.6), dy: Math.round(dy * 1.6) })
+  })
+  function padUp(e) {
+    var p = pointers[e.pointerId]
+    delete pointers[e.pointerId]
+    if (!p) return
+    if (!p.moved) {
+      // tap = click (two-finger tap = right click)
+      var btn = Object.keys(pointers).length > 0 || e.isPrimary === false ? 'right' : 'left'
+      send({ type: 'click', button: btn })
+      buzz(8)
+    }
+  }
+  pad.addEventListener('pointerup', padUp)
+  pad.addEventListener('pointercancel', padUp)
+  document.getElementById('padLeft').addEventListener('pointerdown', function (e) {
+    e.preventDefault(); send({ type: 'click', button: 'left' }); buzz(8)
+  })
+  document.getElementById('padRight').addEventListener('pointerdown', function (e) {
+    e.preventDefault(); send({ type: 'click', button: 'right' }); buzz(8)
+  })
+
+  // ---- settings sheet ----
+  var sheet = document.getElementById('sheet')
+  document.getElementById('gearBtn').addEventListener('pointerdown', function (e) {
+    e.preventDefault()
+    sheet.classList.add('open')
+  })
+  document.getElementById('sheetClose').addEventListener('pointerdown', function (e) {
+    e.preventDefault()
+    sheet.classList.remove('open')
+  })
+  document.getElementById('hapticsRange').addEventListener('input', function (e) {
+    haptics = parseInt(e.target.value, 10) / 100
+  })
+  document.getElementById('scaleRange').addEventListener('input', function (e) {
+    document.documentElement.style.setProperty('--scale', parseInt(e.target.value, 10) / 100)
+  })
+
   // stay awake if the browser supports it
   var wakeLock = null
-  if (navigator.wakeLock) {
-    navigator.wakeLock.request('screen').then(function (wl) { wakeLock = wl }).catch(function () {})
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible' && navigator.wakeLock && !wakeLock) {
-        navigator.wakeLock.request('screen').then(function (wl) { wakeLock = wl }).catch(function () {})
-      }
-    })
+  function reqWake() {
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (l) { wakeLock = l }).catch(function () {})
+    }
   }
-
-  window.addEventListener('beforeunload', function () {
-    clearTimeout(retryT)
-    if (ws) try { ws.close(1000) } catch (e) {}
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') reqWake()
   })
+  reqWake()
+
+  // PWA: install for offline use (service worker)
+  if ('serviceWorker' in navigator && location.protocol !== 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(function () {})
+  }
 
   connect()
 })()

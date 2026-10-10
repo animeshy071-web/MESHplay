@@ -1,0 +1,31 @@
+{
+  "name": "MESHplay Remote",
+  "short_name": "MESHplay",
+  "description": "Offline phone controller for MESHplay - gamepad, steering wheel, fightstick and trackpad over local Wi-Fi, hotspot or USB tethering.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0b0714",
+  "theme_color": "#0b0714",
+  "icons": [
+    {
+      "src": "icons/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

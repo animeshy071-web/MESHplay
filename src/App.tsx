@@ -14,69 +14,211 @@ import SettingsView from './components/SettingsView'
 import PlayView from './components/PlayView'
 import LoadingRing from './components/LoadingRing'
 import SpotifyDrawer from './components/SpotifyDrawer'
-import FileManagerModal from './components/FileManagerModal'
+import LibraryModal from './components/LibraryModal'
 import SearchModal from './components/SearchModal'
 import RemoteModal from './components/RemoteModal'
-import { GAMES, type GameDef } from './lib/games'
+import GameBar from './components/GameBar'
+import PinLock from './components/PinLock'
+import ScreensaverView from './components/ScreensaverView'
+import FindControllerModal from './components/FindControllerModal'
+import CompanionOverlay from './components/CompanionOverlay'
 import { getTheme, applyThemeVars } from './lib/themes'
-import { loadSettings, saveSettings, QUALITY_BACKGROUND_SCALE, QUALITY_WAVES_DETAIL, type Settings, type HomeMode } from './lib/settings'
-import { sfx, initAudio, setSoundEnabled, setVolume } from './lib/sound'
+import { loadSettings, saveSettings, QUALITY_BACKGROUND_SCALE, QUALITY_WAVES_DETAIL, type Settings, type HomeMode, type Quality } from './lib/settings'
+import { sfx, initAudio, setEnabled, setChannelVolume, onWindowBlur, initMixer } from './system/mixer'
 import { getRecents } from './lib/playtime'
 import { remoteHost } from './lib/remote'
 import { createRepeater, type Repeater } from './lib/repeat'
+import { loadLibrary, getGames, type Game } from './system/library'
+import { launcher, initLauncherListener } from './system/launcher'
+import { perfSampler } from './system/stats'
+import { startInputLayer, setDeadzones, setRumbleIntensity, setAutoSwitch } from './system/input'
+import { installActivityWatcher, onIdle } from './system/power'
+import { configure as configureScreensaver, installScreensaverWatcher, forceShow, subscribe as subscribeScreensaver } from './system/screensaver'
+import { hasPin } from './system/pin'
+import { isTauri, tryInvoke } from './system/ipc'
 
 type View = 'boot' | 'home' | 'detail' | 'launching' | 'play' | 'settings'
 
 export default function App() {
   const [view, setView] = useState<View>('boot')
   const [sel, setSel] = useState(0)
-  const [mode, setMode] = useState<HomeMode>('row') // Defaults to the new Horizontal Dashboard!
+  const [mode, setMode] = useState<HomeMode>('row')
   const [activeTab, setActiveTab] = useState<'games' | 'files' | 'spotify' | 'search'>('games')
   const [isSpotifyOpen, setIsSpotifyOpen] = useState(false)
   const [isFilesOpen, setIsFilesOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isRemoteOpen, setIsRemoteOpen] = useState(false)
+  const [isFindOpen, setIsFindOpen] = useState(false)
+  const [isGameBarOpen, setIsGameBarOpen] = useState(false)
+  const [pinGate, setPinGate] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
+  const [screensaverActive, setScreensaverActive] = useState(false)
+  const [dimmed, setDimmed] = useState(false)
   const [settings, setSettings] = useState<Settings>(loadSettings)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [launchTarget, setLaunchTarget] = useState<typeof GAMES[number] | null>(null)
+  const [games, setGames] = useState<Game[]>(() => getGames())
+  const [launchTarget, setLaunchTarget] = useState<Game | null>(null)
+  const [filterMode, setFilterMode] = useState<Settings['filterMode']>(settings.filterMode)
+  const [nativeRunning, setNativeRunning] = useState(false)
 
   const homeScrollRef = useRef<HTMLDivElement>(null)
   const bootDoneRef = useRef(false)
   const launchTimer = useRef<number | null>(null)
   const toastId = useRef(0)
-  const gamepadPrev = useRef<{ ax: boolean[]; btn: boolean[] }>({ ax: [], btn: [] })
   const navRepeat = useRef<Repeater | null>(null)
   if (!navRepeat.current) navRepeat.current = createRepeater(420, 190)
 
   // Dedicated recent games history for Last Played option bar — real play data
-  const [recentGames, setRecentGames] = useState<GameDef[]>(() => {
+  const [recentGames, setRecentGames] = useState<Game[]>(() => {
     const ids = getRecents()
-    const real = ids.map((id) => GAMES.find((g) => g.id === id)).filter((g): g is GameDef => !!g)
+    const all = getGames()
+    const real = ids.map((id) => all.find((g) => g.id === id)).filter((g): g is Game => !!g)
     if (real.length > 0) return real.slice(0, 6)
-    return [GAMES[0], GAMES[2], GAMES[1], GAMES[4], GAMES[8], GAMES[5]]
+    return all.slice(0, 6)
   })
   const [recentSel, setRecentSel] = useState<number>(0)
 
   const theme = getTheme(settings.theme)
-  const maxSel = GAMES.length - 1
-  const focusedGame = GAMES[sel] ?? GAMES[0]
+  const maxSel = games.length - 1
+  const focusedGame = games[sel] ?? games[0]
   const activeGame = view === 'play' || view === 'launching' ? launchTarget : focusedGame
   const wallpaperColors: [string, string] | null =
     view === 'settings' ? null : activeGame ? activeGame.colors : null
 
+  // ---------- library ----------
+  useEffect(() => {
+    void loadLibrary().then((g) => {
+      setGames(g)
+      const ids = getRecents()
+      const real = ids.map((id) => g.find((x) => x.id === id)).filter((x): x is Game => !!x)
+      if (real.length > 0) setRecentGames(real.slice(0, 6))
+    })
+  }, [])
+
+  // ---------- settings effects ----------
   useEffect(() => {
     applyThemeVars(settings.theme)
-    setSoundEnabled(settings.sound)
-    setVolume(settings.uiVolume / 100)
+    setEnabled(settings.sound)
+    setChannelVolume('ui', settings.uiVolume / 100)
+    setChannelVolume('game', settings.gameVolume / 100)
+    setChannelVolume('music', settings.musicVolume / 100)
+    setChannelVolume('voice', settings.voiceVolume / 100)
+    initMixer()
     saveSettings(settings)
     document.documentElement.dataset.motion = settings.reduceMotion ? 'reduced' : 'full'
   }, [settings])
+
+  // display mode (Tauri)
+  useEffect(() => {
+    if (!isTauri()) return
+    void tryInvoke('set_display_mode', { mode: settings.displayMode, monitor: settings.monitor === 'auto' ? null : settings.monitor })
+  }, [settings.displayMode, settings.monitor])
+
+  // mute on window blur
+  useEffect(() => {
+    const onBlur = () => onWindowBlur(true)
+    const onFocus = () => onWindowBlur(false)
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
 
   // Remote Play server lifecycle (LAN WebSocket relay)
   useEffect(() => {
     if (settings.remoteEnabled) remoteHost.start()
     else remoteHost.stop()
   }, [settings.remoteEnabled])
+
+  // universal controller input layer
+  useEffect(() => {
+    const stop = startInputLayer()
+    return stop
+  }, [])
+  useEffect(() => {
+    setDeadzones(settings.deadzoneL, settings.deadzoneR)
+    setRumbleIntensity(settings.rumbleIntensity)
+    setAutoSwitch(settings.autoSwitchInput)
+  }, [settings.deadzoneL, settings.deadzoneR, settings.rumbleIntensity, settings.autoSwitchInput])
+
+  // native game launcher listener (playtime + companion)
+  useEffect(() => initLauncherListener(), [])
+  useEffect(() => {
+    const unsub = launcher.subscribe((active) => setNativeRunning(!!active))
+    return unsub
+  }, [])
+
+  // screensaver
+  useEffect(() => {
+    configureScreensaver(settings.screensaverMode, settings.screensaverTimeout)
+    return installScreensaverWatcher()
+  }, [settings.screensaverMode, settings.screensaverTimeout])
+  useEffect(() => subscribeScreensaver((s) => setScreensaverActive(s.active)), [])
+  useEffect(() => {
+    const dismiss = () => setScreensaverActive(false)
+    window.addEventListener('meshplay:screensaver-dismiss', dismiss)
+    return () => window.removeEventListener('meshplay:screensaver-dismiss', dismiss)
+  }, [])
+
+  // idle dimming
+  useEffect(() => {
+    if (!settings.idleDim) {
+      setDimmed(false)
+      return
+    }
+    return onIdle(() => {
+      setDimmed(true)
+    })
+  }, [settings.idleDim])
+  useEffect(() => {
+    const wake = () => setDimmed(false)
+    const events = ['keydown', 'pointerdown', 'pointermove', 'wheel']
+    for (const e of events) window.addEventListener(e, wake, { passive: true })
+    return () => {
+      for (const e of events) window.removeEventListener(e, wake)
+    }
+  }, [])
+
+  // battery saver auto-mode: when unplugged, degrade the wallpaper
+  useEffect(() => {
+    if (!settings.batterySaver && settings.batterySaver !== false) return
+    void import('./system/power').then(async ({ isOnBattery }) => {
+      const onBattery = await isOnBattery()
+      if (onBattery && settings.quality === 'high') {
+        setSettings((s) => ({ ...s, quality: 'balanced' }))
+        toast('Battery saver: quality balanced')
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.batterySaver])
+
+  // adaptive quality ladder (perf dips → degrade one step)
+  useEffect(() => {
+    if (!settings.adaptiveQuality) return
+    perfSampler.onLowFps(() => {
+      setSettings((s) => {
+        const order: Quality[] = ['high', 'balanced', 'eco']
+        const i = order.indexOf(s.quality)
+        if (i < 2) {
+          toast(`Adaptive quality: ${order[i + 1]}`)
+          return { ...s, quality: order[i + 1] }
+        }
+        return s
+      })
+    })
+  }, [settings.adaptiveQuality])
+
+  // PIN gate check (after boot finishes)
+  useEffect(() => {
+    if (bootDoneRef.current && !unlocked) {
+      void hasPin().then((has) => {
+        if (has && settings.pinEnabled) setPinGate(true)
+        else setUnlocked(true)
+      })
+    }
+  }, [view, unlocked, settings.pinEnabled])
 
   // Sync mode with defaultView when changed from settings
   useEffect(() => {
@@ -86,7 +228,8 @@ export default function App() {
   useEffect(() => {
     const onGesture = () => {
       initAudio()
-      if (settings.sound) setVolume(settings.uiVolume / 100)
+      initMixer()
+      if (settings.sound) setChannelVolume('ui', settings.uiVolume / 100)
     }
     window.addEventListener('keydown', onGesture)
     window.addEventListener('pointerdown', onGesture)
@@ -107,7 +250,7 @@ export default function App() {
       setSel((s) => {
         let n: number
         if (mode === 'crescent') {
-          n = (s + d + GAMES.length) % GAMES.length
+          n = (s + d + games.length) % games.length
         } else {
           n = Math.min(maxSel, Math.max(0, s + d))
         }
@@ -115,7 +258,7 @@ export default function App() {
         return n
       })
     },
-    [mode, maxSel],
+    [mode, maxSel, games.length],
   )
 
   const switchMode = useCallback(() => {
@@ -132,22 +275,35 @@ export default function App() {
     setView('settings')
   }, [])
 
-  const startLaunch = useCallback((targetGame?: typeof GAMES[number]) => {
-    const g = targetGame ?? GAMES[sel] ?? GAMES[0]
+  const startLaunch = useCallback((targetGame?: Game) => {
+    const g = targetGame ?? games[sel] ?? games[0]
     if (!g) return
+    // native PC games: real process + companion widget (no in-app play view)
+    if (g.kind === 'native' && g.exePath) {
+      sfx.launch()
+      void launcher.launchNative(g).then((pid) => {
+        if (pid) {
+          toast(`▶ ${g.title} launched`)
+          setView('home')
+        } else {
+          sfx.error()
+          toast('Launch failed — check the game path')
+        }
+      })
+      return
+    }
     sfx.launch()
     setLaunchTarget(g)
     setView('launching')
-    // real recents: persisted by the playtime store on session start
     import('./lib/playtime').then(({ getRecents }) => {
       const ids = getRecents()
-      const real = ids.map((id) => GAMES.find((item) => item.id === id)).filter((item): item is GameDef => !!item)
+      const real = ids.map((id) => games.find((item) => item.id === id)).filter((item): item is Game => !!item)
       if (real.length > 0) setRecentGames(real.slice(0, 6))
     })
     setRecentSel(0)
     homeScrollRef.current?.scrollTo?.({ top: 0 })
     launchTimer.current = window.setTimeout(() => setView('play'), 1300)
-  }, [sel])
+  }, [sel, games, toast])
 
   const goHome = useCallback(() => {
     sfx.back()
@@ -155,7 +311,7 @@ export default function App() {
   }, [])
 
   // Keyboard routing — any open drawer/modal swallows nav keys (no leaks underneath)
-  const overlayOpen = isSpotifyOpen || isFilesOpen || isSearchOpen || isRemoteOpen
+  const overlayOpen = isSpotifyOpen || isFilesOpen || isSearchOpen || isRemoteOpen || isFindOpen || pinGate || screensaverActive
   useEffect(() => {
     if (view !== 'home' && view !== 'detail' && view !== 'launching') return
     if (overlayOpen) return
@@ -168,7 +324,6 @@ export default function App() {
             e.preventDefault()
             switchMode()
           } else if (mode === 'crescent') {
-            // Crescent mode keyboard bindings: Arrow keys rotate games along the orbital arc!
             if (e.code === 'ArrowUp' || e.code === 'ArrowLeft') {
               e.preventDefault()
               rep.press(e.code, () => move(-1))
@@ -191,6 +346,7 @@ export default function App() {
               setIsRemoteOpen(true)
             } else if (e.code === 'KeyF') {
               e.preventDefault()
+              sfx.select()
               setIsFilesOpen(true)
             } else if (e.code === 'KeyM') {
               e.preventDefault()
@@ -198,6 +354,11 @@ export default function App() {
             } else if (e.code === 'Slash') {
               e.preventDefault()
               setIsSearchOpen(true)
+            } else if (e.code === 'KeyG') {
+              // Shift+Tab / Win+G style: open Game Bar on the focused game
+              e.preventDefault()
+              sfx.pause()
+              setIsGameBarOpen(true)
             }
           }
           break
@@ -229,31 +390,12 @@ export default function App() {
     }
   }, [view, mode, overlayOpen, move, startLaunch, goHome, openSettings, switchMode])
 
-  // Gamepad bridge + FPS meter loop
+  // FPS meter loop (the gamepad bridge lives in system/input now)
   const fpsElRef = useRef<HTMLSpanElement>(null)
   useEffect(() => {
     let raf = 0
     let frames = 0
     let fpsT = performance.now()
-    const repeatT: Record<string, number> = {}
-
-    const fire = (code: string) => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }))
-    }
-    const held = (gp: Gamepad, kind: 'ax' | 'btn', idx: number, code: string, now: number) => {
-      const active = kind === 'ax' ? Math.abs(gp.axes[idx] ?? 0) > 0.55 : !!gp.buttons[idx]?.pressed
-      const prev = gamepadPrev.current[kind][idx] ?? false
-      const key = `${kind}${idx}`
-      if (active && !prev) {
-        fire(code)
-        repeatT[key] = now + 420
-      } else if (active && prev && now > (repeatT[key] ?? 0)) {
-        fire(code)
-        repeatT[key] = now + 190
-      }
-      return active
-    }
-
     const step = (now: number) => {
       raf = requestAnimationFrame(step)
       frames++
@@ -262,23 +404,6 @@ export default function App() {
         if (fpsElRef.current) fpsElRef.current.textContent = `${v} FPS`
         frames = 0
         fpsT = now
-      }
-      const gp = navigator.getGamepads?.()[0] ?? navigator.getGamepads?.()[1] ?? null
-      if (!gp) return
-      held(gp, 'ax', 0, gp.axes[0] < 0 ? 'ArrowLeft' : 'ArrowRight', now)
-      held(gp, 'ax', 1, gp.axes[1] < 0 ? 'ArrowUp' : 'ArrowDown', now)
-      held(gp, 'btn', 0, 'Enter', now)
-      held(gp, 'btn', 1, 'Escape', now)
-      held(gp, 'btn', 4, 'ArrowLeft', now)
-      held(gp, 'btn', 5, 'ArrowRight', now)
-      // Y button toggles mode
-      const yActive = !!gp.buttons[3]?.pressed
-      const yPrev = gamepadPrev.current.btn[3] ?? false
-      if (yActive && !yPrev) fire('Tab')
-      held(gp, 'btn', 9, 'Escape', now)
-      gamepadPrev.current = {
-        ax: [Math.abs(gp.axes[0] ?? 0) > 0.55, Math.abs(gp.axes[1] ?? 0) > 0.55],
-        btn: gp.buttons.map((b) => b.pressed),
       }
     }
     raf = requestAnimationFrame(step)
@@ -292,6 +417,7 @@ export default function App() {
           { k: '↑↓←→', label: 'Navigate' },
           { k: 'Enter / (A)', label: 'Play' },
           { k: 'S', label: 'Settings' },
+          { k: 'G', label: 'Game Bar' },
         ]
       : view === 'detail'
         ? [
@@ -306,10 +432,26 @@ export default function App() {
             ]
           : view === 'play'
             ? [
-                { k: 'Esc', label: 'Pause' },
+                { k: 'Esc / Guide', label: 'Game Bar' },
                 { k: '1-4 QWER ASDF ZXCV', label: 'Controls' },
               ]
             : []
+
+  // native launch fullscreen: apply once a native game starts
+  useEffect(() => {
+    if (nativeRunning && settings.launchFullscreen && isTauri()) {
+      void tryInvoke('set_display_mode', { mode: 'fullscreen' })
+    }
+  }, [nativeRunning, settings.launchFullscreen])
+
+  // locked behind PIN: render the gate only
+  if (pinGate) {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-[#050308]">
+        <PinLock onUnlocked={() => { setPinGate(false); setUnlocked(true) }} />
+      </div>
+    )
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#050308]">
@@ -386,9 +528,8 @@ export default function App() {
       {/* Home View: Switchable between Xbox Horizontal Dashboard and Orbital Crescent */}
       {view === 'home' && (
         mode === 'row' ? (
-          /* Xbox Series X Horizontal Dashboard */
           <Row
-            games={GAMES}
+            games={games}
             sel={sel}
             accent={[theme.acc, theme.acc2]}
             onSelect={(i) => setSel(i)}
@@ -398,17 +539,15 @@ export default function App() {
             onOpenSearch={() => setIsSearchOpen(true)}
             onOpenSpotify={() => setIsSpotifyOpen(true)}
             onOpenDetails={(g) => {
-              const idx = GAMES.findIndex((item) => item.id === g.id)
+              const idx = games.findIndex((item) => item.id === g.id)
               if (idx !== -1) setSel(idx)
               setView('detail')
             }}
           />
         ) : (
-          /* Orbital Crescent View with independent Last Played option bar */
           <div className="absolute inset-0 z-20 overflow-hidden select-none anim-fade-in">
-            {/* Fixed Left Orbital Crescent HUD Arc with rotatable profile portal */}
             <OrbitalCrescent
-              games={GAMES}
+              games={games}
               sel={sel}
               onSelect={(i) => setSel(i)}
               onLaunch={(g) => startLaunch(g)}
@@ -420,7 +559,6 @@ export default function App() {
               onOpenSearch={() => setIsSearchOpen(true)}
             />
 
-            {/* Section: Hero Game Showcase (Centered & aligned, comfortable breathing room from crescent) */}
             {focusedGame && (
               <HeroGame
                 game={focusedGame}
@@ -432,7 +570,6 @@ export default function App() {
               />
             )}
 
-            {/* Separate Option Bar: Last Played (Completely independent from Crescent) */}
             <LastPlayedCarousel
               games={recentGames}
               sel={recentSel}
@@ -452,7 +589,7 @@ export default function App() {
         <DetailView game={focusedGame} onPlay={() => startLaunch()} onBack={goHome} />
       )}
 
-      {/* Launching Loading Ring */}
+      {/* Launching Loading Ring (emulator games only) */}
       {view === 'launching' && launchTarget && (
         <div
           className="absolute inset-0 z-50 flex items-center justify-center bg-black/65 anim-fade-in"
@@ -462,9 +599,45 @@ export default function App() {
         </div>
       )}
 
-      {/* Gameplay View */}
+      {/* Gameplay View (CHIP-8 + Game Boy cores, with floating Game Bar) */}
       {view === 'play' && launchTarget && (
-        <PlayView game={launchTarget} onExit={goHome} scanlines={settings.scanlines} smooth={settings.smoothScaling} />
+        <PlayView
+          game={launchTarget}
+          onExit={goHome}
+          filterMode={filterMode}
+          onFilterChange={(m) => {
+            setFilterMode(m)
+            setSettings((s) => ({ ...s, filterMode: m }))
+          }}
+          smooth={settings.smoothScaling}
+        />
+      )}
+
+      {/* Game Bar on home (focused game preview + controls) */}
+      {isGameBarOpen && view !== 'play' && focusedGame && focusedGame.kind !== 'native' && (
+        <GameBar
+          game={focusedGame}
+          api={{
+            screenshot: () => Promise.resolve(null),
+            saveReplay: () => Promise.resolve(null),
+            saveState: () => Promise.resolve(null),
+            loadState: () => Promise.resolve(false),
+            listStates: () => Promise.resolve([]),
+            rewind: () => false,
+            rewindDepth: () => 0,
+            softReset: () => undefined,
+            exit: () => {
+              setIsGameBarOpen(false)
+              setView('home')
+            },
+          }}
+          filterMode={filterMode}
+          onFilterChange={(m) => {
+            setFilterMode(m)
+            setSettings((s) => ({ ...s, filterMode: m }))
+          }}
+          onClose={() => setIsGameBarOpen(false)}
+        />
       )}
 
       {/* Settings Modal */}
@@ -475,12 +648,13 @@ export default function App() {
           onBack={goHome}
           toast={toast}
           onOpenRemote={() => setIsRemoteOpen(true)}
+          onOpenFindController={() => setIsFindOpen(true)}
         />
       )}
 
       {/* Console Drawers & Modals */}
       <SpotifyDrawer isOpen={isSpotifyOpen} onClose={() => setIsSpotifyOpen(false)} />
-      <FileManagerModal
+      <LibraryModal
         isOpen={isFilesOpen}
         onClose={() => setIsFilesOpen(false)}
         onSelectGame={(idx) => setSel(idx)}
@@ -497,11 +671,28 @@ export default function App() {
           onToggleEnabled={(v) => setSettings((s) => ({ ...s, remoteEnabled: v }))}
         />
       )}
-      {/* Quality: swap background engine cost on the fly */}
-      {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
+      {isFindOpen && <FindControllerModal onClose={() => setIsFindOpen(false)} />}
+
+      {/* Screensaver */}
+      <ScreensaverView reels={games.map((g) => ({ title: g.title, tagline: g.tagline, desc: g.desc }))} />
+
+      {/* Native game running: embedded companion widget (web dev mode) */}
+      {nativeRunning && !isTauri() && (
+        <div className="absolute right-6 top-20 z-[75] anim-fade-up">
+          <CompanionOverlay embedded />
+        </div>
+      )}
+
+      {/* Idle dim overlay */}
+      {dimmed && !screensaverActive && (
+        <div
+          className="pointer-events-none absolute inset-0 z-[85] bg-black anim-fade-in"
+          style={{ opacity: 0.75, transition: 'opacity 1.2s' }}
+        />
+      )}
 
       {/* Bottom Contextual Hints (shown in crescent mode or detail/play) */}
-      {view !== 'boot' && mode === 'crescent' && <Hints items={hints} />}
+      {view !== 'boot' && mode === 'crescent' && !screensaverActive && <Hints items={hints} />}
       <Toasts toasts={toasts} />
 
       {/* FPS Counter */}

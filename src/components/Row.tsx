@@ -1,19 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
-import type { GameDef } from '../lib/games'
+﻿import { useEffect, useRef, useState } from 'react'
+import type { Game } from '../system/library'
 import TileArt from './TileArt'
 import { sfx } from '../lib/sound'
 
 interface Props {
-  games: GameDef[]
+  games: Game[]
   sel: number
   accent: [string, string]
   onSelect: (i: number) => void
-  onLaunch: (game: GameDef) => void
+  onLaunch: (game: Game) => void
   onOpenSettings: () => void
   onOpenFiles: () => void
   onOpenSearch: () => void
   onOpenSpotify: () => void
-  onOpenDetails: (game: GameDef) => void
+  onOpenDetails: (game: Game) => void
 }
 
 type FocusRow = 'games' | 'banners'
@@ -111,9 +111,9 @@ export default function Row({
   return (
     <div className="absolute inset-0 z-20 flex flex-col justify-end overflow-hidden px-14 pb-7 select-none anim-fade-in font-sans">
 
-      {/* ─────────────────────────────────────────────────────────────
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           ROW 1: Horizontal Game Squircle Tiles (1:1 Ratio)
-          ───────────────────────────────────────────────────────────── */}
+          â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative z-30 mb-4" aria-label="Recent Games">
         <div
           ref={gamesScrollRef}
@@ -177,9 +177,9 @@ export default function Row({
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────────
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           ROW 2: Featured Action Banners (Wide 16:9 Cards)
-          ───────────────────────────────────────────────────────────── */}
+          â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative z-30 mb-3" aria-label="Featured Actions">
         <div className="grid grid-cols-4 gap-4.5">
           {/* Banner 1: Browse your games */}
@@ -198,14 +198,14 @@ export default function Row({
           >
             {/* Collage Artwork background */}
             <div className="absolute inset-0 flex opacity-75">
-              <div className="w-1/4 bg-gradient-to-b from-emerald-800 to-green-950 flex items-center justify-center text-xs">👾</div>
-              <div className="w-1/4 bg-gradient-to-b from-blue-800 to-indigo-950 flex items-center justify-center text-xs">🧱</div>
-              <div className="w-1/4 bg-gradient-to-b from-purple-800 to-fuchsia-950 flex items-center justify-center text-xs">🚀</div>
-              <div className="w-1/4 bg-gradient-to-b from-amber-800 to-orange-950 flex items-center justify-center text-xs">🏎️</div>
+              <div className="w-1/4 bg-gradient-to-b from-emerald-800 to-green-950 flex items-center justify-center text-xs">ðŸ‘¾</div>
+              <div className="w-1/4 bg-gradient-to-b from-blue-800 to-indigo-950 flex items-center justify-center text-xs">ðŸ§±</div>
+              <div className="w-1/4 bg-gradient-to-b from-purple-800 to-fuchsia-950 flex items-center justify-center text-xs">ðŸš€</div>
+              <div className="w-1/4 bg-gradient-to-b from-amber-800 to-orange-950 flex items-center justify-center text-xs">ðŸŽï¸</div>
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
             <div className="absolute bottom-3 left-4 flex items-center gap-2">
-              <span className="text-lg">🎮</span>
+              <span className="text-lg">ðŸŽ®</span>
               <span className="text-xs font-bold text-white tracking-wide">Browse your games</span>
             </div>
           </div>
@@ -226,7 +226,7 @@ export default function Row({
           >
             <div className="absolute inset-0 bg-gradient-to-tr from-[#0a1822] to-[#122c3b] flex items-center justify-center">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 border border-white/15 text-2xl">
-                🎨
+                ðŸŽ¨
               </div>
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
@@ -259,9 +259,9 @@ export default function Row({
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
             <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
               <span className="truncate text-xs font-extrabold text-white tracking-wide">
-                {focusedGame.title} · Play
+                {focusedGame.title} Â· Play
               </span>
-              <span className="text-xs text-emerald-400 font-black">▶</span>
+              <span className="text-xs text-emerald-400 font-black">â–¶</span>
             </div>
           </div>
 
@@ -281,7 +281,7 @@ export default function Row({
           >
             <div className="absolute inset-0 bg-[#050508] flex items-center justify-end pr-4">
               <div className="text-3xl opacity-50 transition-transform duration-300 group-hover:scale-110">
-                🕹️
+                ðŸ•¹ï¸
               </div>
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent" />

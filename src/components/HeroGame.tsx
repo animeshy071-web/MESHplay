@@ -1,8 +1,8 @@
-import type { GameDef } from '../lib/games'
+﻿import type { Game } from '../system/library'
 import { sfx } from '../lib/sound'
 
 interface Props {
-  game: GameDef
+  game: Game
   onPlay: () => void
   onOptions?: () => void
   className?: string

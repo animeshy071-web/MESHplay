@@ -1,8 +1,8 @@
-import type { GameDef } from '../lib/games'
+﻿import type { Game } from '../system/library'
 import TileArt from './TileArt'
 
 interface Props {
-  game: GameDef
+  game: Game
   onPlay: () => void
   onBack: () => void
 }
@@ -37,7 +37,7 @@ export default function DetailView({ game, onPlay, onBack }: Props) {
         <p className="text-[15px] leading-relaxed text-white/65">{game.desc}</p>
 
         <div className="mt-1 rounded-2xl bg-white/5 px-4 py-3 text-xs leading-relaxed text-white/45">
-          <span className="font-bold text-white/70">Controls:</span> keypad 1 2 3 4 / Q W E R / A S D F / Z X C V · Esc pauses
+          <span className="font-bold text-white/70">Controls:</span> keypad 1 2 3 4 / Q W E R / A S D F / Z X C V Â· Esc pauses
         </div>
 
         <button
@@ -48,7 +48,7 @@ export default function DetailView({ game, onPlay, onBack }: Props) {
             boxShadow: `0 0 40px -8px ${game.colors[0]}`,
           }}
         >
-          <span className="text-xl leading-none">▶</span> PLAY
+          <span className="text-xl leading-none">â–¶</span> PLAY
         </button>
       </div>
 

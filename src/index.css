@@ -63,6 +63,38 @@ button { outline: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
+/* --- form controls (Add/Edit Game, Settings suite) --- */
+.input {
+  width: 100%;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.input:focus {
+  border-color: var(--acc);
+  background: rgba(255, 255, 255, 0.09);
+}
+.input::placeholder { color: rgba(255, 255, 255, 0.25); }
+select.input option { background: #17102b; color: #fff; }
+
+.btn-sm {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.btn-sm:hover { background: rgba(255, 255, 255, 0.18); }
+
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }

@@ -1,5 +1,6 @@
+// Universal search across the whole library (built-in + custom + Steam + ROMs).
 import { useState } from 'react'
-import { GAMES } from '../lib/games'
+import { getGames, type Game } from '../system/library'
 import { sfx } from '../lib/sound'
 
 interface Props {
@@ -13,12 +14,16 @@ export default function SearchModal({ isOpen, onClose, onSelectGame }: Props) {
 
   if (!isOpen) return null
 
-  const filtered = GAMES.map((g, i) => ({ ...g, originalIdx: i })).filter(
-    (g) =>
-      g.title.toLowerCase().includes(query.toLowerCase()) ||
-      g.tagline.toLowerCase().includes(query.toLowerCase()) ||
-      g.author.toLowerCase().includes(query.toLowerCase()),
-  )
+  const games = getGames()
+  const filtered = games
+    .map((g, i) => ({ ...g, originalIdx: i }))
+    .filter(
+      (g: Game & { originalIdx: number }) =>
+        g.title.toLowerCase().includes(query.toLowerCase()) ||
+        g.tagline.toLowerCase().includes(query.toLowerCase()) ||
+        (g.author ?? '').toLowerCase().includes(query.toLowerCase()) ||
+        (g.platform ?? '').toLowerCase().includes(query.toLowerCase()),
+    )
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/65 backdrop-blur-md anim-fade-in">
@@ -85,7 +90,7 @@ export default function SearchModal({ isOpen, onClose, onSelectGame }: Props) {
                     <div className="text-xs text-white/40">{g.tagline}</div>
                   </div>
                 </div>
-                <span className="text-xs text-white/50">{g.year}</span>
+                <span className="text-xs text-white/50">{g.year ?? g.platform ?? ''}</span>
               </div>
             ))
           )}
