@@ -98,7 +98,7 @@ export default function RemoteModal({ onClose, enabled, onToggleEnabled }: Props
                 <span className="text-sm font-bold text-white/85">{statusLabel[remote.status]}</span>
               </div>
               <div className="text-xs leading-relaxed text-white/45">
-                Server runs with MESHplay (dev). Traffic stays on your home network — pairing works only through this QR.
+                Server runs inside MESHplay — phones pair over your local Wi-Fi, hotspot, or USB tether. Traffic never leaves your network.
               </div>
             </div>
 

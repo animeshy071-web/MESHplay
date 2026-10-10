@@ -6,7 +6,7 @@ import { GAMES, type GameDef } from '../lib/games'
 import type { GameRow } from './db'
 import * as db from './db'
 import { tryInvoke, isTauri } from './ipc'
-import { matchRom } from './romdb'
+import { matchRom, ensureBigDb } from './romdb'
 import { normalizeTitle } from './petools'
 
 export type GameKind = 'chip8' | 'gb' | 'native'
@@ -30,6 +30,9 @@ export interface Game {
   workDir?: string
   artPath?: string
   artMime?: string
+  bannerPath?: string
+  logoPath?: string
+  tags?: string
   crc32?: number
   source: 'builtin' | 'custom' | 'steam' | 'rom'
   lastPlayed?: number
@@ -67,6 +70,9 @@ function rowToGame(r: GameRow): Game {
     workDir: r.work_dir ?? undefined,
     artPath: r.art ?? undefined,
     artMime: r.art_mime ?? undefined,
+    bannerPath: r.banner ?? undefined,
+    logoPath: r.logo ?? undefined,
+    tags: r.tags ?? undefined,
     crc32: r.crc32 ?? undefined,
     source: r.source as Game['source'],
     lastPlayed: r.last_played ?? undefined,
@@ -98,6 +104,9 @@ async function seedBuiltin(): Promise<void> {
       art: null,
       art_mime: null,
       crc32: null,
+      banner: null,
+      logo: null,
+      tags: null,
       source: 'builtin',
       added_at: 0,
       last_played: null,
@@ -108,6 +117,7 @@ async function seedBuiltin(): Promise<void> {
 
 export async function loadLibrary(): Promise<Game[]> {
   await seedBuiltin()
+  void ensureBigDb() // extended OpenVGDB hashes load in the background
   const rows = await db.listGames()
   state.games = rows.map(rowToGame)
   state.loaded = true
@@ -153,6 +163,9 @@ export async function saveGame(game: Partial<Game> & { id: string }): Promise<vo
     colors: JSON.stringify(game.colors ?? safeColors(prev?.colors)),
     art: game.artPath ?? prev?.art ?? null,
     art_mime: game.artMime ?? prev?.art_mime ?? null,
+    banner: game.bannerPath ?? prev?.banner ?? null,
+    logo: game.logoPath ?? prev?.logo ?? null,
+    tags: game.tags ?? prev?.tags ?? null,
     crc32: game.crc32 ?? prev?.crc32 ?? null,
     source: (game.source ?? prev?.source ?? 'custom') as GameRow['source'],
     added_at: prev?.added_at ?? Date.now(),
@@ -167,7 +180,7 @@ export async function removeGame(id: string, deleteFiles: boolean): Promise<void
   const g = getGame(id)
   await db.deleteGame(id)
   if (deleteFiles && g) {
-    for (const p of [g.exePath, g.rom, g.artPath]) {
+    for (const p of [g.exePath, g.rom, g.artPath, g.bannerPath, g.logoPath]) {
       if (p && !p.startsWith('http') && !p.startsWith('data:') && !p.startsWith('roms/')) {
         await tryInvoke('delete_to_recycle_bin', { path: p })
       }
@@ -330,6 +343,7 @@ export interface RomScanResult {
 
 /** Scan a ROM folder recursively; hash-match offline; add playable entries. */
 export async function scanRomFolder(folder: string): Promise<RomScanResult> {
+  await ensureBigDb() // extended hash DB ready before matching
   const roms = await tryInvoke<{ path: string; name: string; platform: string; crc32: number; size: number }[]>('scan_roms', { folder })
   if (!roms) return { found: 0, added: 0, recognized: 0 }
   const existing = new Set((await db.listGames()).map((g) => g.crc32))

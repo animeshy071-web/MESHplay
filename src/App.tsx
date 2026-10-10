@@ -22,9 +22,10 @@ import PinLock from './components/PinLock'
 import ScreensaverView from './components/ScreensaverView'
 import FindControllerModal from './components/FindControllerModal'
 import CompanionOverlay from './components/CompanionOverlay'
+import MoodModal from './components/MoodModal'
 import { getTheme, applyThemeVars } from './lib/themes'
 import { loadSettings, saveSettings, QUALITY_BACKGROUND_SCALE, QUALITY_WAVES_DETAIL, type Settings, type HomeMode, type Quality } from './lib/settings'
-import { sfx, initAudio, setEnabled, setChannelVolume, onWindowBlur, initMixer } from './system/mixer'
+import { sfx, initAudio, setEnabled, setChannelVolume, onWindowBlur, initMixer, setSpatial, setMuteOnBlur, setOutputDevice } from './system/mixer'
 import { getRecents } from './lib/playtime'
 import { remoteHost } from './lib/remote'
 import { createRepeater, type Repeater } from './lib/repeat'
@@ -32,10 +33,12 @@ import { loadLibrary, getGames, type Game } from './system/library'
 import { launcher, initLauncherListener } from './system/launcher'
 import { perfSampler } from './system/stats'
 import { startInputLayer, setDeadzones, setRumbleIntensity, setAutoSwitch } from './system/input'
-import { installActivityWatcher, onIdle } from './system/power'
+import { installActivityWatcher, onIdle, armSleepTimer } from './system/power'
+import { initRemap } from './system/remap'
+import { setNativeActive } from './system/oskb'
 import { configure as configureScreensaver, installScreensaverWatcher, forceShow, subscribe as subscribeScreensaver } from './system/screensaver'
 import { hasPin } from './system/pin'
-import { isTauri, tryInvoke } from './system/ipc'
+import { isTauri, tryInvoke, listen } from './system/ipc'
 
 type View = 'boot' | 'home' | 'detail' | 'launching' | 'play' | 'settings'
 
@@ -49,6 +52,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isRemoteOpen, setIsRemoteOpen] = useState(false)
   const [isFindOpen, setIsFindOpen] = useState(false)
+  const [isMoodOpen, setIsMoodOpen] = useState(false)
   const [isGameBarOpen, setIsGameBarOpen] = useState(false)
   const [pinGate, setPinGate] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
@@ -103,16 +107,27 @@ export default function App() {
     setChannelVolume('game', settings.gameVolume / 100)
     setChannelVolume('music', settings.musicVolume / 100)
     setChannelVolume('voice', settings.voiceVolume / 100)
+    setSpatial(settings.spatialAudio)
+    setMuteOnBlur(settings.muteOnBlur)
     initMixer()
     saveSettings(settings)
     document.documentElement.dataset.motion = settings.reduceMotion ? 'reduced' : 'full'
   }, [settings])
 
-  // display mode (Tauri)
+  // display mode + monitor + resolution (Tauri)
   useEffect(() => {
     if (!isTauri()) return
-    void tryInvoke('set_display_mode', { mode: settings.displayMode, monitor: settings.monitor === 'auto' ? null : settings.monitor })
-  }, [settings.displayMode, settings.monitor])
+    void tryInvoke('set_display_mode', {
+      mode: settings.displayMode,
+      monitor: settings.monitor === 'auto' ? null : settings.monitor,
+      resolution: settings.resolution === 'auto' ? null : settings.resolution,
+    })
+  }, [settings.displayMode, settings.monitor, settings.resolution])
+
+  // audio output device (setSinkId)
+  useEffect(() => {
+    setOutputDevice(settings.audioOutput)
+  }, [settings.audioOutput])
 
   // mute on window blur
   useEffect(() => {
@@ -132,10 +147,14 @@ export default function App() {
     else remoteHost.stop()
   }, [settings.remoteEnabled])
 
-  // universal controller input layer
+  // universal controller input layer + M5 remap layer
   useEffect(() => {
     const stop = startInputLayer()
-    return stop
+    const stopRemap = initRemap()
+    return () => {
+      stop()
+      stopRemap()
+    }
   }, [])
   useEffect(() => {
     setDeadzones(settings.deadzoneL, settings.deadzoneR)
@@ -143,12 +162,20 @@ export default function App() {
     setAutoSwitch(settings.autoSwitchInput)
   }, [settings.deadzoneL, settings.deadzoneR, settings.rumbleIntensity, settings.autoSwitchInput])
 
-  // native game launcher listener (playtime + companion)
+  // native game launcher listener (playtime + companion + remap bridge)
   useEffect(() => initLauncherListener(), [])
   useEffect(() => {
-    const unsub = launcher.subscribe((active) => setNativeRunning(!!active))
+    const unsub = launcher.subscribe((active) => {
+      setNativeRunning(!!active)
+      setNativeActive(!!active) // OS keyboard bridge follows the game
+    })
     return unsub
   }, [])
+
+  // sleep timer → real system standby after N minutes idle (native only)
+  useEffect(() => {
+    return armSleepTimer(settings.sleepTimer, () => launcher.getActive() !== null)
+  }, [settings.sleepTimer])
 
   // screensaver
   useEffect(() => {
@@ -245,6 +272,14 @@ export default function App() {
     setTimeout(() => setToasts((ts) => ts.filter((t) => t.id !== id)), 2600)
   }, [])
 
+  // anti-cheat guard: toast when remap was suppressed for a protected game
+  useEffect(() => {
+    void listen('remap-blocked', (payload) => {
+      const p = payload as { brand?: string; title?: string }
+      toast(`🛡 ${p.brand ?? 'Anti-cheat'} detected — remap disabled for ${p.title ?? 'this game'}`)
+    })
+  }, [toast])
+
   const move = useCallback(
     (d: number) => {
       setSel((s) => {
@@ -311,7 +346,7 @@ export default function App() {
   }, [])
 
   // Keyboard routing — any open drawer/modal swallows nav keys (no leaks underneath)
-  const overlayOpen = isSpotifyOpen || isFilesOpen || isSearchOpen || isRemoteOpen || isFindOpen || pinGate || screensaverActive
+  const overlayOpen = isSpotifyOpen || isFilesOpen || isSearchOpen || isRemoteOpen || isFindOpen || isMoodOpen || pinGate || screensaverActive
   useEffect(() => {
     if (view !== 'home' && view !== 'detail' && view !== 'launching') return
     if (overlayOpen) return
@@ -351,6 +386,10 @@ export default function App() {
             } else if (e.code === 'KeyM') {
               e.preventDefault()
               setIsSpotifyOpen(true)
+            } else if (e.code === 'KeyV') {
+              e.preventDefault()
+              sfx.select()
+              setIsMoodOpen(true)
             } else if (e.code === 'Slash') {
               e.preventDefault()
               setIsSearchOpen(true)
@@ -610,6 +649,8 @@ export default function App() {
             setSettings((s) => ({ ...s, filterMode: m }))
           }}
           smooth={settings.smoothScaling}
+          targetFps={settings.targetFps}
+          vsync={settings.vsync}
         />
       )}
 
@@ -663,6 +704,10 @@ export default function App() {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelectGame={(idx) => setSel(idx)}
+        onOpenMood={() => {
+          setIsSearchOpen(false)
+          setIsMoodOpen(true)
+        }}
       />
       {isRemoteOpen && (
         <RemoteModal
@@ -672,6 +717,21 @@ export default function App() {
         />
       )}
       {isFindOpen && <FindControllerModal onClose={() => setIsFindOpen(false)} />}
+      {isMoodOpen && (
+        <MoodModal
+          isOpen={isMoodOpen}
+          onClose={() => setIsMoodOpen(false)}
+          onLaunch={(g) => {
+            setIsMoodOpen(false)
+            startLaunch(g)
+          }}
+          onFocus={(g) => {
+            const idx = games.findIndex((item) => item.id === g.id)
+            if (idx !== -1) setSel(idx)
+            setView('detail')
+          }}
+        />
+      )}
 
       {/* Screensaver */}
       <ScreensaverView reels={games.map((g) => ({ title: g.title, tagline: g.tagline, desc: g.desc }))} />

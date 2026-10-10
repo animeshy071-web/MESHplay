@@ -47,9 +47,15 @@ export function endSession(): void {
   if (!store.active) return
   const secs = Math.round((Date.now() - store.activeStart) / 1000)
   if (secs > 0) store.seconds[store.active] = (store.seconds[store.active] ?? 0) + secs
+  const playedId = store.active
   store.active = null
   store.activeStart = 0
   save()
+  // mirror into the local SQLite database so profile stats, badges and the
+  // storage manager see emulated playtime too (native mode)
+  if (secs > 0) {
+    void import('../system/db').then(({ addPlaytime }) => addPlaytime(playedId, secs))
+  }
 }
 
 export function getRecents(): string[] {

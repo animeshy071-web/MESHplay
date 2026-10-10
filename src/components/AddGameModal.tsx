@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { saveGame, removeGame, type Game } from '../system/library'
 import { sfx } from '../system/mixer'
 import { isTauri, tryInvoke } from '../system/ipc'
+import { fetchArt, getApiKeys, setApiKeys, type ScrapeResult } from '../system/scrape'
 
 interface Props {
   game: Game | null // null = create new (from picked file)
@@ -30,8 +31,13 @@ export default function AddGameModal({ game, onSaved, onClose }: Props) {
   const [workDir, setWorkDir] = useState(game?.workDir ?? '')
   const [exePath, setExePath] = useState(game?.exePath ?? '')
   const [kind, setKind] = useState(game?.kind ?? 'native')
+  const [tags, setTags] = useState(game?.tags ?? '')
   const [art, setArt] = useState<ArtPreview>({})
   const [busy, setBusy] = useState(false)
+  const [fetchingArt, setFetchingArt] = useState(false)
+  const [fetchMsg, setFetchMsg] = useState('')
+  const [keysOpen, setKeysOpen] = useState(false)
+  const [keys, setKeys] = useState(getApiKeys())
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -86,12 +92,37 @@ export default function AddGameModal({ game, onSaved, onClose }: Props) {
       platform: kind === 'native' ? 'PC (Native)' : 'Emulated',
       artPath: art.artPath ?? game?.artPath,
       artMime: art.artPath ? 'image/*' : game?.artMime,
+      bannerPath: art.bannerPath ?? game?.bannerPath,
+      logoPath: art.logoPath ?? game?.logoPath,
+      tags: tags.trim() || undefined,
       source: game?.source ?? 'custom',
     })
     sfx.chime()
     setBusy(false)
     onSaved()
     onClose()
+  }
+
+  /** Online art fetch — Steam (keyless) + optional SteamGridDB/RAWG/IGDB keys. */
+  const autoFetchArt = async () => {
+    if (!title.trim()) return
+    setFetchingArt(true)
+    setFetchMsg('Searching providers…')
+    const res = (await fetchArt(title.trim())) as ScrapeResult | { error: string }
+    setFetchingArt(false)
+    if ('error' in res) {
+      setFetchMsg(res.error)
+      sfx.error()
+      return
+    }
+    setArt((a) => ({
+      ...a,
+      artPath: res.art ?? a.artPath,
+      bannerPath: res.banner ?? a.bannerPath,
+      logoPath: res.logo ?? a.logoPath,
+    }))
+    setFetchMsg(`Art fetched via ${res.source} ✓`)
+    sfx.chime()
   }
 
   return (
@@ -136,14 +167,48 @@ export default function AddGameModal({ game, onSaved, onClose }: Props) {
               <textarea className="input h-20 resize-none" value={desc} onChange={(e) => setDesc(e.target.value)} />
             </Field>
           </div>
+          <div className="col-span-2">
+            <Field label="Genre tags (comma separated)">
+              <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Racing, Arcade, Co-op" />
+            </Field>
+          </div>
         </div>
 
         {/* art */}
         <div className="mt-4 grid grid-cols-3 gap-3">
           <ArtSlot label="Box art" path={art.artPath ?? game?.artPath} onPick={() => void pickArt('artPath')} />
-          <ArtSlot label="Banner" path={art.bannerPath} onPick={() => void pickArt('bannerPath')} />
-          <ArtSlot label="Logo" path={art.logoPath} onPick={() => void pickArt('logoPath')} />
+          <ArtSlot label="Banner" path={art.bannerPath ?? game?.bannerPath} onPick={() => void pickArt('bannerPath')} />
+          <ArtSlot label="Logo" path={art.logoPath ?? game?.logoPath} onPick={() => void pickArt('logoPath')} />
         </div>
+
+        {/* online art fetch */}
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            className="rounded-full bg-white/8 px-4 py-2 text-xs font-bold text-white/70 transition hover:bg-white/15 disabled:opacity-40"
+            disabled={fetchingArt || !title.trim()}
+            onClick={() => void autoFetchArt()}
+          >
+            {fetchingArt ? 'Fetching art…' : '🌐 Auto-fetch art (online)'}
+          </button>
+          <button
+            className="rounded-full px-3 py-2 text-xs font-semibold text-white/40 transition hover:text-white/80"
+            onClick={() => setKeysOpen((v) => !v)}
+          >
+            API keys…
+          </button>
+          {fetchMsg && <span className="text-xs text-white/50">{fetchMsg}</span>}
+        </div>
+        {keysOpen && (
+          <div className="mt-2 grid grid-cols-2 gap-3 rounded-2xl bg-white/5 p-4">
+            <KeyField label="SteamGridDB key" value={keys.steamgriddb ?? ''} onChange={(v) => { const next = { ...keys, steamgriddb: v || undefined }; setKeys(next); setApiKeys(next) }} />
+            <KeyField label="RAWG key" value={keys.rawg ?? ''} onChange={(v) => { const next = { ...keys, rawg: v || undefined }; setKeys(next); setApiKeys(next) }} />
+            <KeyField label="IGDB (Twitch) client id" value={keys.igdbId ?? ''} onChange={(v) => { const next = { ...keys, igdbId: v || undefined }; setKeys(next); setApiKeys(next) }} />
+            <KeyField label="IGDB (Twitch) secret" value={keys.igdbSecret ?? ''} onChange={(v) => { const next = { ...keys, igdbSecret: v || undefined }; setKeys(next); setApiKeys(next) }} />
+            <p className="col-span-2 text-[10px] leading-relaxed text-white/35">
+              All optional — Steam box art works keyless. Keys are stored on this PC only.
+            </p>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-between">
           {game && game.source !== 'builtin' ? (
@@ -187,14 +252,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ArtSlot({ label, path, onPick }: { label: string; path?: string; onPick: () => void }) {
+  const [loaded, setLoaded] = useState<string | null>(path?.startsWith('data:') ? path : null)
+  useEffect(() => {
+    let dead = false
+    if (path?.startsWith('data:')) {
+      setLoaded(path)
+      return
+    }
+    if (path && isTauri() && !path.startsWith('http')) {
+      void tryInvoke<{ dataUrl: string }>('read_art', { path }).then((r) => {
+        if (!dead && r) setLoaded(r.dataUrl)
+      })
+    } else if (!path) {
+      setLoaded(null)
+    }
+    return () => {
+      dead = true
+    }
+  }, [path])
   return (
     <button
       className="group flex flex-col items-center gap-2 rounded-3xl bg-white/5 px-3 py-4 transition hover:bg-white/10"
       onClick={onPick}
     >
       <div className="flex h-20 w-16 items-center justify-center overflow-hidden rounded-xl bg-black/30">
-        {path?.startsWith('data:') ? (
-          <img src={path} alt={label} className="h-full w-full object-cover" />
+        {loaded ? (
+          <img src={loaded} alt={label} className="h-full w-full object-cover" />
         ) : (
           <span className="text-2xl opacity-40 transition group-hover:opacity-80">{label === 'Box art' ? '🖼' : label === 'Banner' ? '🎞' : '🏷'}</span>
         )}
@@ -202,5 +285,14 @@ function ArtSlot({ label, path, onPick }: { label: string; path?: string; onPick
       <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{label}</span>
       <span className="text-[9px] text-white/25">{path ? 'Attached ✓' : 'Click to attach'}</span>
     </button>
+  )
+}
+
+function KeyField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{label}</span>
+      <input className="input" type="password" value={value} onChange={(e) => onChange(e.target.value)} spellCheck={false} />
+    </label>
   )
 }

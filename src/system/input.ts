@@ -6,6 +6,7 @@
 
 import { markActive } from './power'
 import { emitLocal } from './ipc'
+import { osKey } from './oskb'
 
 export interface ButtonMap {
   up: string
@@ -70,7 +71,9 @@ let guidePrev = false
 let comboPrev = false
 let prevButtons: boolean[] = []
 let repeatT: Record<string, number> = {}
-let phoneAxes: [number, number, number, number] = [0, 0, 0, 0]
+let phoneAxes: [number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0]
+// phone wheel mode: gyro steering gamma (-45..45 deg) + active flag
+export const phoneWheel = { gamma: 0, active: false }
 
 const listeners = new Set<Listener>()
 
@@ -130,16 +133,20 @@ function applyDeadzone(v: number, dz: number): number {
 }
 
 /** Phone remote analog axes (from lib/remote) merge into the same state. */
-export function setPhoneAxes(axes: [number, number, number, number]): void {
-  phoneAxes = axes
+export function setPhoneAxes(axes: [number, number, number, number, number?, number?]): void {
+  phoneAxes = [axes[0], axes[1], axes[2], axes[3], axes[4] ?? 0, axes[5] ?? 0]
   state.lastSource = 'phone'
   markActive()
 }
 
+/** Phone wheel (gyro steering) state for the remap layer. */
+export function setPhoneWheel(gamma: number, active: boolean): void {
+  phoneWheel.gamma = gamma
+  phoneWheel.active = active
+}
+
 function fireKey(code: string, down: boolean): void {
-  window.dispatchEvent(
-    new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code, bubbles: true, cancelable: true }),
-  )
+  osKey(code, down)
 }
 
 function pushState(): void {
@@ -184,7 +191,7 @@ export function startInputLayer(): () => void {
       }
       // phone axes still drive the state
       if (phoneAxes.some((v) => Math.abs(v) > 0.08)) {
-        state.axes = phoneAxes
+        state.axes = [phoneAxes[0], phoneAxes[1], phoneAxes[2], phoneAxes[3]]
         pushState()
       }
       return
@@ -294,9 +301,12 @@ export function axesForEmulator(): { lx: number; ly: number; rx: number; ry: num
   const merged: [number, number, number, number] = state.gamepadConnected
     ? state.axes
     : phoneAxes.some((v) => Math.abs(v) > 0.08)
-      ? phoneAxes
+      ? [phoneAxes[0], phoneAxes[1], phoneAxes[2], phoneAxes[3]]
       : [0, 0, 0, 0]
-  return { lx: merged[0], ly: merged[1], rx: merged[2], ry: merged[3], lt: state.triggers[0], rt: state.triggers[1] }
+  const phoneHasTriggers = phoneAxes[4] > 0.05 || phoneAxes[5] > 0.05
+  const lt = state.gamepadConnected ? state.triggers[0] : phoneHasTriggers ? phoneAxes[4] : 0
+  const rt = state.gamepadConnected ? state.triggers[1] : phoneHasTriggers ? phoneAxes[5] : 0
+  return { lx: merged[0], ly: merged[1], rx: merged[2], ry: merged[3], lt, rt }
 }
 
 /** Remap-capture helper: returns a promise resolving with the next pressed button index. */

@@ -148,6 +148,14 @@
   }
   .gyro.on { background: rgba(52, 211, 153, 0.25); box-shadow: 0 0 20px -6px #34d399; border-color: rgba(52,211,153,0.5); }
 
+  /* layout edit mode */
+  body.editing .btn {
+    outline: 2px dashed rgba(168, 85, 247, 0.65);
+    outline-offset: 3px;
+    cursor: move;
+  }
+  body.editing .stage { pointer-events: auto; }
+
   /* fightstick */
   .fight { display: flex; align-items: center; justify-content: space-evenly; }
   .fbtns { display: grid; grid-template-columns: repeat(3, calc(64px * var(--scale))); gap: 12px; }
@@ -305,6 +313,10 @@
   <h3>Controller settings</h3>
   <label>Haptics intensity <input type="range" id="hapticsRange" min="0" max="100" value="70" /></label>
   <label>Button scale <input type="range" id="scaleRange" min="80" max="130" value="100" /></label>
+  <label>Edit button layout <input type="checkbox" id="editLayoutCheckbox" style="accent-color: var(--acc); width: 20px; height: 20px;" /></label>
+  <label style="justify-content: center;">
+    <button id="resetLayout" style="background: var(--glass); border: 1px solid var(--edge); color: rgba(255,255,255,0.8); border-radius: 999px; padding: 8px 18px; font-size: 12px; font-weight: 700; width: 100%;">Reset layout</button>
+  </label>
   <label>Gyro steering <input type="checkbox" id="gyroCheckbox" style="accent-color: var(--acc); width: 20px; height: 20px;" /></label>
   <label style="color: rgba(255,255,255,0.45); font-size: 11px;">MESHplay Remote — 100% offline over local Wi-Fi, hotspot, or USB tethering. Installable app.</label>
 </div>
@@ -398,7 +410,7 @@
     })
   })
 
-  // ---- digital buttons ----
+  // ---- digital buttons (dpads use container-level glide handling below) ----
   function down(el, code) {
     el.classList.add('press')
     buzz(8)
@@ -409,6 +421,7 @@
     send({ type: 'input', action: 'up', code: code })
   }
   document.querySelectorAll('.btn[data-code]').forEach(function (el) {
+    if (el.closest('.dpad')) return // handled by the dpad glide controller
     var code = el.getAttribute('data-code')
     el.addEventListener('pointerdown', function (e) {
       e.preventDefault()
@@ -418,6 +431,65 @@
     el.addEventListener('pointerup', function (e) { e.preventDefault(); up(el, code) })
     el.addEventListener('pointercancel', function () { up(el, code) })
     el.addEventListener('contextmenu', function (e) { e.preventDefault() })
+  })
+
+  // ---- D-pad with diagonal glide: direction is derived from the touch
+  // position relative to the pad center, so sliding across the pad produces
+  // smooth diagonals (up+right etc.) instead of four isolated buttons.
+  document.querySelectorAll('.dpad').forEach(function (padEl) {
+    var btns = {
+      up: padEl.querySelector('.up'),
+      down: padEl.querySelector('.down'),
+      left: padEl.querySelector('.left'),
+      right: padEl.querySelector('.right')
+    }
+    var held = {}
+    var activeId = null
+    var center = { x: 0, y: 0 }
+
+    function apply(dirs) {
+      for (var d in btns) {
+        var want = dirs[d] === true
+        if (want === !!held[d]) continue
+        held[d] = want
+        if (btns[d]) btns[d].classList.toggle('press', want)
+        send({ type: 'input', action: want ? 'down' : 'up', code: btns[d] ? btns[d].getAttribute('data-code') : d })
+      }
+    }
+    function fromPoint(e) {
+      var rect = padEl.getBoundingClientRect()
+      var dx = e.clientX - center.x
+      var dy = e.clientY - center.y
+      var dz = rect.width * 0.14
+      apply({
+        left: dx < -dz,
+        right: dx > dz,
+        up: dy < -dz,
+        down: dy > dz
+      })
+    }
+    padEl.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      activeId = e.pointerId
+      padEl.setPointerCapture(e.pointerId)
+      var rect = padEl.getBoundingClientRect()
+      center.x = rect.left + rect.width / 2
+      center.y = rect.top + rect.height / 2
+      buzz(8)
+      fromPoint(e)
+    })
+    padEl.addEventListener('pointermove', function (e) {
+      if (activeId !== e.pointerId) return
+      fromPoint(e)
+    })
+    function release(e) {
+      if (activeId !== e.pointerId) return
+      activeId = null
+      apply({})
+    }
+    padEl.addEventListener('pointerup', release)
+    padEl.addEventListener('pointercancel', release)
+    padEl.addEventListener('contextmenu', function (e) { e.preventDefault() })
   })
 
   // ---- Guide button: opens the MESHplay Game Bar ----
@@ -630,6 +702,70 @@
   })
   document.getElementById('scaleRange').addEventListener('input', function (e) {
     document.documentElement.style.setProperty('--scale', parseInt(e.target.value, 10) / 100)
+  })
+
+  // ---- button repositioning (customizer): drag buttons in edit mode ----
+  var editLayout = false
+  var LAYOUT_KEY = 'meshplay.remote.layout.v1'
+  var offsets = {}
+  try { offsets = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') } catch (err) { offsets = {} }
+
+  function elKey(el) {
+    var layout = el.closest('.layout')
+    var lid = layout ? layout.id : 'global'
+    var parent = el.parentElement
+    var pk = parent && parent.className ? String(parent.className).split(' ')[0] : ''
+    var code = el.getAttribute('data-code') || el.id || (el.textContent || '').trim().slice(0, 8)
+    return lid + ':' + pk + ':' + code
+  }
+  function applyOffsets() {
+    document.querySelectorAll('.layout .btn').forEach(function (el) {
+      var off = offsets[elKey(el)]
+      el.style.transform = off ? 'translate(' + off[0] + 'px,' + off[1] + 'px)' : ''
+    })
+  }
+  applyOffsets()
+
+  var editCheckbox = document.getElementById('editLayoutCheckbox')
+  editCheckbox.addEventListener('change', function () {
+    editLayout = editCheckbox.checked
+    document.body.classList.toggle('editing', editLayout)
+    buzz(14)
+  })
+  document.getElementById('resetLayout').addEventListener('pointerdown', function (e) {
+    e.preventDefault()
+    offsets = {}
+    try { localStorage.removeItem(LAYOUT_KEY) } catch (err) {}
+    applyOffsets()
+    buzz(14)
+  })
+
+  // while editing, swallow presses so dragging doesn't fire buttons
+  var drag = null
+  document.addEventListener('pointerdown', function (e) {
+    if (!editLayout) return
+    var el = e.target.closest ? e.target.closest('.btn') : null
+    if (!el) return
+    e.stopPropagation()
+    e.preventDefault()
+    var key = elKey(el)
+    var off = offsets[key] || [0, 0]
+    drag = { el: el, key: key, sx: e.clientX, sy: e.clientY, ox: off[0], oy: off[1] }
+  }, true)
+  document.addEventListener('pointermove', function (e) {
+    if (!drag) return
+    var dx = e.clientX - drag.sx + drag.ox
+    var dy = e.clientY - drag.sy + drag.oy
+    drag.el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'
+  })
+  document.addEventListener('pointerup', function () {
+    if (!drag) return
+    var m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(drag.el.style.transform)
+    if (m) {
+      offsets[drag.key] = [parseFloat(m[1]), parseFloat(m[2])]
+      try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(offsets)) } catch (err) {}
+    }
+    drag = null
   })
 
   // stay awake if the browser supports it

@@ -64,11 +64,21 @@ export function getChannelVolume(ch: Channel): number {
 
 export function setSpatial(v: boolean): void {
   spatial = v
-  // gentle widening: ui stays centered, game/music get a whisper of spread
+  // Real widening: game + music channels get opposite stereo spread, with a
+  // touch more on music (console "surround" feel). UI + voice stay centered
+  // for clarity.
+  if (!ctx) return
   for (const key of Object.keys(channels) as Channel[]) {
     const ch = channels[key]
     if (!ch.panner) continue
-    ch.panner.pan.value = spatial && key !== 'ui' && key !== 'voice' ? (key === 'game' ? 0 : 0) : 0
+    const target = !spatial
+      ? 0
+      : key === 'game'
+        ? 0.16
+        : key === 'music'
+          ? -0.24
+          : 0
+    ch.panner.pan.setTargetAtTime(target, ctx.currentTime, 0.12)
   }
 }
 
@@ -93,11 +103,22 @@ export async function listOutputDevices(): Promise<MediaDeviceInfo[]> {
   }
 }
 
+let blurMuteEnabled = false
+
 export function setMuteOnBlur(v: boolean): void {
-  void v // handled by initBlurWatcher registration in App
+  blurMuteEnabled = v
+  if (!v && mutedByBlur) {
+    mutedByBlur = false
+    applyMaster()
+  }
 }
 
 export function onWindowBlur(blurred: boolean): void {
+  if (!blurMuteEnabled) {
+    mutedByBlur = false
+    applyMaster()
+    return
+  }
   if (!mutedByBlur && blurred) {
     mutedByBlur = true
     applyMaster()

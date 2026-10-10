@@ -36,6 +36,8 @@ interface Props {
   filterMode: FilterMode
   onFilterChange: (m: FilterMode) => void
   smooth: boolean
+  targetFps: number // 0 = uncapped
+  vsync: boolean
 }
 
 const CANVAS_W = 768
@@ -43,7 +45,7 @@ const CANVAS_H = 384
 const GB_CANVAS_W = 960
 const GB_CANVAS_H = 864
 
-export default function PlayView({ game, onExit, filterMode, onFilterChange, smooth }: Props) {
+export default function PlayView({ game, onExit, filterMode, onFilterChange, smooth, targetFps, vsync }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const coreRef = useRef<Chip8 | GameBoy | null>(null)
   const romRef = useRef<Uint8Array | null>(null)
@@ -71,6 +73,7 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
     let raf = 0
     let frames = 0
     let fpsT = performance.now()
+    let lastFrame = 0
 
     let audioCtx: AudioContext | null = null
     let gain: GainNode | null = null
@@ -141,6 +144,13 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
       raf = requestAnimationFrame(step)
       const core = coreRef.current
       if (!core) return
+
+      // Frame budget: target FPS limiter + V-Sync frame pacing.
+      // vsync on + uncapped → natural rAF pacing (display refresh).
+      // otherwise → gate to the target (30/60/120) or a 240 fps soft cap.
+      const cap = targetFpsRef.current > 0 ? targetFpsRef.current : vsyncRef.current ? 0 : 240
+      if (cap > 0 && now - lastFrame < 1000 / cap - 1) return
+      lastFrame = now
 
       frames++
       if (now - fpsT > 500) {
@@ -336,6 +346,10 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
   onExitRef.current = onExit
   const filterModeRef = useRef(filterMode)
   filterModeRef.current = filterMode
+  const targetFpsRef = useRef(targetFps)
+  targetFpsRef.current = targetFps
+  const vsyncRef = useRef(vsync)
+  vsyncRef.current = vsync
 
   const pauseAction = (i: number) => {
     const core = coreRef.current

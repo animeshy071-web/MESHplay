@@ -25,6 +25,7 @@ export interface Settings {
   // display
   displayMode: DisplayMode
   monitor: string // 'auto' or monitor name
+  resolution: string // 'auto' or 'WxH'
   targetFps: number // 30 | 60 | 120 | 0 (uncapped)
   vsync: boolean
   hdr: boolean
@@ -42,6 +43,8 @@ export interface Settings {
   deadzoneR: number
   rumbleIntensity: number // 0..100
   autoSwitchInput: boolean
+  remapEnabled: boolean // gamepad → keyboard/mouse for native games (M5)
+  wheelSteering: boolean // phone wheel gyro → A/D steering (M5)
   // remote & system
   remoteEnabled: boolean
   screensaverMode: ScreensaverMode
@@ -71,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
   displayMode: 'windowed',
   monitor: 'auto',
+  resolution: 'auto',
   targetFps: 0,
   vsync: true,
   hdr: false,
@@ -88,6 +92,8 @@ export const DEFAULT_SETTINGS: Settings = {
   deadzoneR: 12,
   rumbleIntensity: 60,
   autoSwitchInput: true,
+  remapEnabled: true,
+  wheelSteering: true,
 
   remoteEnabled: true,
   screensaverMode: 'clock',

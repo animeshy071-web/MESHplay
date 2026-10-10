@@ -28,6 +28,9 @@ export interface GameRow {
   added_at: number
   last_played: number | null
   seconds: number
+  banner?: string | null // horizontal banner art (path or data URL)
+  logo?: string | null // transparent logo (path or data URL)
+  tags?: string | null // comma-separated genre tags
 }
 
 export interface ScreenshotRow {
@@ -112,12 +115,13 @@ export async function upsertGame(g: GameRow): Promise<void> {
       {
         sql: `INSERT OR REPLACE INTO games
           (id, title, tagline, description, kind, rom, exe_path, args, work_dir, platform,
-           publisher, developer, year, colors, art, art_mime, crc32, source, added_at, last_played, seconds)
-          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)`,
+           publisher, developer, year, colors, art, art_mime, crc32, source, added_at, last_played, seconds,
+           banner, logo, tags)
+          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)`,
         params: [
           g.id, g.title, g.tagline, g.description, g.kind, g.rom, g.exe_path, g.args, g.work_dir, g.platform,
           g.publisher, g.developer, g.year, g.colors, g.art, g.art_mime, g.crc32, g.source, g.added_at,
-          g.last_played, g.seconds,
+          g.last_played, g.seconds, g.banner ?? null, g.logo ?? null, g.tags ?? null,
         ],
       },
     )

@@ -10,8 +10,9 @@ import { createRepeater, type Repeater } from '../lib/repeat'
 import { computeBadges, loadProfile, saveProfile, AVATAR_COUNT, AVATAR_PALETTES, type Profile, type Badge } from '../system/profile'
 import { setPin, clearPin } from '../system/pin'
 import { isTauri, tryInvoke } from '../system/ipc'
-import { captureButton, getProfile as getGamepadProfile, saveProfile as saveGamepadProfile, setDeadzones, setRumbleIntensity, rumble, type GamepadProfile } from '../system/input'
-import { setStartWithWindows, isStartWithWindows } from '../system/power'
+import { captureButton, getProfile as getGamepadProfile, saveProfile as saveGamepadProfile, setDeadzones, setRumbleIntensity, rumble, subscribe as subscribeInput, getState as getInputState, type GamepadProfile } from '../system/input'
+import { setStartWithWindows, isStartWithWindows, sleepNow, openUrl } from '../system/power'
+import { getRemap, saveRemap } from '../system/remap'
 
 interface Props {
   settings: Settings
@@ -20,6 +21,19 @@ interface Props {
   toast: (msg: string) => void
   onOpenRemote: () => void
   onOpenFindController: () => void
+}
+
+interface MonitorInfo {
+  name: string
+  width: number
+  height: number
+  isPrimary: boolean
+  isCurrent: boolean
+}
+
+interface AudioDevice {
+  deviceId: string
+  label: string
 }
 
 interface RowDef {
@@ -31,6 +45,8 @@ interface RowDef {
   custom?: () => React.ReactNode
 }
 
+const RESOLUTIONS = ['auto', '1280x720', '1600x900', '1920x1080', '2560x1440'] as const
+
 export default function SettingsView({ settings, onChange, onBack, toast, onOpenRemote, onOpenFindController }: Props) {
   const [section, setSection] = useState(0)
   const [row, setRow] = useState(0)
@@ -41,6 +57,9 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
   const [pinBuffer, setPinBuffer] = useState('')
   const [storage, setStorage] = useState<Record<string, number> | null>(null)
   const [autostart, setAutostart] = useState(false)
+  const [monitors, setMonitors] = useState<MonitorInfo[]>([])
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([])
+  const [vigem, setVigem] = useState<{ installed: boolean } | null>(null)
   const [padProfile, setPadProfile] = useState<GamepadProfile>(getGamepadProfile())
   const [capturing, setCapturing] = useState<string | null>(null)
   const [editingProfile, setEditingProfile] = useState(false)
@@ -57,6 +76,18 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
       setHours(b.hours)
       setStorage(isTauri() ? ((await tryInvoke('storage_breakdown')) as Record<string, number>) : null)
       setAutostart(await isStartWithWindows())
+      if (isTauri()) {
+        const mons = await tryInvoke<MonitorInfo[]>('list_monitors')
+        setMonitors(mons ?? [])
+        const vig = await tryInvoke<{ installed: boolean }>('vigem_status')
+        setVigem(vig ?? { installed: false })
+      }
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        setAudioDevices(devices.filter((d) => d.kind === 'audiooutput').map((d) => ({ deviceId: d.deviceId, label: d.label || 'Output device' })))
+      } catch {
+        /* no device list */
+      }
     })()
   }, [])
 
@@ -160,11 +191,40 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
     {
       name: 'Video',
       rows: [
-        { label: 'Display mode', value: () => ({ fullscreen: 'Fullscreen', borderless: 'Borderless', windowed: 'Windowed' }[settings.displayMode]), action: () => { const modes: DisplayMode[] = ['windowed', 'borderless', 'fullscreen']; set('displayMode', modes[(modes.indexOf(settings.displayMode) + 1) % 3]); sfx.select(); void tryInvoke('set_display_mode', { mode: modes[(modes.indexOf(settings.displayMode) + 1) % 3] }) } },
+        { label: 'Display mode', value: () => ({ fullscreen: 'Fullscreen', borderless: 'Borderless', windowed: 'Windowed' }[settings.displayMode]), action: () => { const modes: DisplayMode[] = ['windowed', 'borderless', 'fullscreen']; const next = modes[(modes.indexOf(settings.displayMode) + 1) % 3]; set('displayMode', next); sfx.select(); void tryInvoke('set_display_mode', { mode: next, monitor: settings.monitor === 'auto' ? null : settings.monitor, resolution: settings.resolution === 'auto' ? null : settings.resolution }) } },
+        {
+          label: 'Monitor output',
+          value: () => {
+            if (settings.monitor === 'auto') return 'Auto'
+            const m = monitors.find((x) => x.name === settings.monitor)
+            return m ? m.name : 'Auto'
+          },
+          action: () => {
+            const options = ['auto', ...monitors.map((m) => m.name)]
+            const i = options.indexOf(settings.monitor)
+            const next = options[(i + 1) % options.length]
+            set('monitor', next)
+            sfx.select()
+            void tryInvoke('set_display_mode', { mode: settings.displayMode, monitor: next === 'auto' ? null : next, resolution: settings.resolution === 'auto' ? null : settings.resolution })
+            toast(next === 'auto' ? 'Output: Auto' : `Output: ${next}`)
+          },
+        },
+        {
+          label: 'Resolution',
+          value: () => (settings.resolution === 'auto' ? 'Native' : settings.resolution),
+          action: () => {
+            const i = RESOLUTIONS.indexOf(settings.resolution as (typeof RESOLUTIONS)[number])
+            const next = RESOLUTIONS[(i + 1) % RESOLUTIONS.length]
+            set('resolution', next)
+            sfx.select()
+            void tryInvoke('set_display_mode', { mode: settings.displayMode, monitor: settings.monitor === 'auto' ? null : settings.monitor, resolution: next === 'auto' ? null : next })
+            toast(`Resolution: ${next === 'auto' ? 'Native' : next}`)
+          },
+        },
         { label: 'FPS counter', value: () => (settings.fps ? 'On' : 'Off'), action: () => { set('fps', !settings.fps); sfx.select() } },
         { label: 'Target FPS', value: () => (settings.targetFps === 0 ? 'Uncapped' : `${settings.targetFps} FPS`), action: () => { const opts = [0, 30, 60, 120]; set('targetFps', opts[(opts.indexOf(settings.targetFps) + 1) % 4]); sfx.select() } },
-        { label: 'V-Sync', value: () => (settings.vsync ? 'On' : 'Off'), action: () => { set('vsync', !settings.vsync); sfx.select() } },
-        { label: 'HDR', value: () => (settings.hdr ? 'On' : 'Off'), action: () => { set('hdr', !settings.hdr); sfx.select(); toast(settings.hdr ? 'HDR off' : 'HDR on (display permitting)') } },
+        { label: 'V-Sync', value: () => (settings.vsync ? 'On' : 'Off'), action: () => { set('vsync', !settings.vsync); sfx.select(); toast(settings.vsync ? 'Frame pacing: display sync' : 'Frame pacing: unlocked') } },
+        { label: 'HDR', value: () => (settings.hdr ? 'On' : 'Windows panel'), action: () => { set('hdr', !settings.hdr); sfx.select(); void openUrl('ms-settings:hdr'); toast('Windows HDR settings opened — toggle HDR there') } },
         { label: 'In-game filter', value: () => ({ off: 'Off', crt: 'CRT Scanlines', lcd: 'LCD Grid', sharp: 'Sharp Pixel', smooth: 'Smooth' }[settings.filterMode as FilterMode]), action: () => { const modes: FilterMode[] = ['off', 'crt', 'lcd', 'sharp', 'smooth']; set('filterMode', modes[(modes.indexOf(settings.filterMode) + 1) % 5]); sfx.select() } },
         { label: 'CRT scanlines (home)', value: () => (settings.scanlines ? 'On' : 'Off'), action: () => { set('scanlines', !settings.scanlines); sfx.select() } },
         { label: 'Smooth scaling', value: () => (settings.smoothScaling ? 'On' : 'Off'), action: () => { set('smoothScaling', !settings.smoothScaling); sfx.select() } },
@@ -199,15 +259,33 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
           action: () => set('voiceVolume', settings.voiceVolume >= 100 ? 0 : Math.min(100, settings.voiceVolume + 10)),
           slider: { min: 0, max: 100, step: 5, get: () => settings.voiceVolume, set: (v) => set('voiceVolume', v) },
         },
-        { label: 'Spatial audio', value: () => (settings.spatialAudio ? 'On' : 'Off'), action: () => { set('spatialAudio', !settings.spatialAudio); sfx.select() } },
+        { label: 'Spatial audio', value: () => (settings.spatialAudio ? 'On' : 'Off'), action: () => { set('spatialAudio', !settings.spatialAudio); sfx.select(); toast(settings.spatialAudio ? 'Spatial widening on' : 'Spatial widening off') } },
         { label: 'Mute on blur', value: () => (settings.muteOnBlur ? 'On' : 'Off'), action: () => { set('muteOnBlur', !settings.muteOnBlur); sfx.select() } },
-        { label: 'Output device', value: () => (settings.audioOutput === 'default' ? 'System default' : 'Selected device'), action: () => { set('audioOutput', settings.audioOutput === 'default' ? 'headphones' : 'default'); sfx.select(); toast(`Output: ${settings.audioOutput === 'default' ? 'headphones' : 'system default'}`) } },
+        {
+          label: 'Output device',
+          value: () => {
+            if (settings.audioOutput === 'default') return 'System default'
+            const dev = audioDevices.find((d) => d.deviceId === settings.audioOutput)
+            return dev ? dev.label.slice(0, 24) : 'Custom device'
+          },
+          action: () => {
+            const options = ['default', ...audioDevices.map((d) => d.deviceId)]
+            const i = options.indexOf(settings.audioOutput)
+            const next = options[(i + 1) % options.length]
+            set('audioOutput', next)
+            sfx.select()
+            void import('../system/mixer').then(({ setOutputDevice }) => setOutputDevice(next))
+            const dev = audioDevices.find((d) => d.deviceId === next)
+            toast(`Output: ${next === 'default' ? 'System default' : dev?.label.slice(0, 30) ?? 'device'}`)
+          },
+        },
       ],
     },
     {
       name: 'Power',
       rows: [
-        { label: 'Sleep timer', value: () => (settings.sleepTimer === 0 ? 'Never' : `${settings.sleepTimer} min`), action: () => { const opts = [0, 15, 30, 60]; set('sleepTimer', opts[(opts.indexOf(settings.sleepTimer) + 1) % 4]); sfx.select() } },
+        { label: 'Sleep timer', value: () => (settings.sleepTimer === 0 ? 'Never' : `${settings.sleepTimer} min`), action: () => { const opts = [0, 15, 30, 60]; set('sleepTimer', opts[(opts.indexOf(settings.sleepTimer) + 1) % 4]); sfx.select(); toast(settings.sleepTimer === 0 ? 'Sleep timer off' : `Standby after ${settings.sleepTimer} min idle`) } },
+        { label: 'Sleep now', value: () => 'standby', action: async () => { sfx.pause(); const ok = await sleepNow(); toast(ok ? 'Entering standby…' : 'Sleep unavailable in web preview') } },
         { label: 'Screen dim on idle', value: () => (settings.idleDim ? 'On' : 'Off'), action: () => { set('idleDim', !settings.idleDim); sfx.select() } },
         { label: 'Start with Windows', value: () => (settings.startWithWindows ? 'On' : 'Off'), action: () => { const next = !settings.startWithWindows; set('startWithWindows', next); void setStartWithWindows(next); setAutostart(next); sfx.select(); toast(next ? 'Auto-start enabled' : 'Auto-start disabled') } },
         { label: 'Launch fullscreen', value: () => (settings.launchFullscreen ? 'On' : 'Off'), action: () => { set('launchFullscreen', !settings.launchFullscreen); sfx.select() } },
@@ -238,10 +316,21 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
           slider: { min: 0, max: 100, step: 10, get: () => settings.rumbleIntensity, set: (v) => { set('rumbleIntensity', v); setRumbleIntensity(v) } },
         },
         { label: 'Test rumble', value: () => 'buzz', action: () => { rumble(400, true); sfx.select() } },
+        {
+          label: 'Stick drift visualizer',
+          value: () => 'live',
+          action: () => sfx.select(),
+          custom: () => <DriftPad />,
+        },
         { label: 'Gamepad/mouse auto-switch', value: () => (settings.autoSwitchInput ? 'On' : 'Off'), action: () => { set('autoSwitchInput', !settings.autoSwitchInput); sfx.select() } },
-        ...(['confirm', 'back', 'mode', 'gamebar'] as const).map((actionKey) => ({
+        { label: 'OS remap for PC games', value: () => (settings.remapEnabled ? 'On' : 'Off'), action: () => { set('remapEnabled', !settings.remapEnabled); saveRemap({ enabled: !settings.remapEnabled }); sfx.select(); toast(settings.remapEnabled ? 'Keyboard/mouse remap disabled for PC games' : 'Gamepad → keyboard/mouse remap on (native games)') } },
+        { label: 'Wheel → steering keys', value: () => (settings.wheelSteering ? 'On' : 'Off'), action: () => { set('wheelSteering', !settings.wheelSteering); saveRemap({ wheelSteering: !settings.wheelSteering }); sfx.select(); toast(settings.wheelSteering ? 'Phone wheel maps to A/D + pedals' : 'Wheel steering mapping off') } },
+        ...(['up', 'down', 'left', 'right', 'confirm', 'back', 'mode', 'gamebar'] as const).map((actionKey) => ({
           label: `${actionKey[0].toUpperCase()}${actionKey.slice(1)} button`,
-          value: () => `Btn ${padProfile.buttons[actionKey]}`,
+          value: () => {
+            const btn = padProfile.buttons[actionKey]
+            return actionKey === 'gamebar' ? 'Guide' : `Btn ${btn}`
+          },
           action: () => {
             sfx.select()
             setCapturing(actionKey)
@@ -257,6 +346,16 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
             })
           },
         })),
+        {
+          label: 'Virtual controller bridge',
+          value: () => (vigem ? (vigem.installed ? 'ViGEmBus ✓' : 'Driver not found') : '…'),
+          action: () => {
+            sfx.select()
+            void openUrl('https://vigem.org/')
+            toast('ViGEmBus guide opened — driver lets phones act as real Xbox pads')
+          },
+        },
+        { label: 'Anti-cheat safety', value: () => 'always on', action: () => { sfx.select(); toast('Input injection auto-disables for anti-cheat games') } },
         { label: 'Find My Controller', value: () => 'sonar', action: () => { sfx.select(); onOpenFindController() } },
       ],
     },
@@ -327,7 +426,7 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
     {
       name: 'About',
       rows: [
-        { label: 'Version', value: () => 'MESHplay v0.3.0-m3', action: () => sfx.select() },
+        { label: 'Version', value: () => 'MESHplay v0.4.0', action: () => sfx.select() },
         { label: 'Library', value: () => 'see Library manager', action: () => sfx.select() },
         { label: 'Offline', value: () => '100% · no telemetry', action: () => sfx.select() },
         { label: 'Total playtime', value: () => `${hours.toFixed(1)}h`, action: () => sfx.select() },
@@ -548,4 +647,75 @@ function formatBytes(b: number): string {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
   if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} MB`
   return `${(b / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+/** Live analog-stick drift visualizer — real gamepad state, drawn at 60fps. */
+function DriftPad() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#a855f7'
+    let raf = 0
+    const draw = () => {
+      raf = requestAnimationFrame(draw)
+      const w = canvas.width
+      const h = canvas.height
+      const cx = w / 2
+      const cy = h / 2
+      const r = Math.min(cx, cy) - 4
+      ctx.clearRect(0, 0, w, h)
+      // deadzone rings + crosshair
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+      ctx.lineWidth = 1
+      for (const ring of [r, r * 0.66, r * 0.33]) {
+        ctx.beginPath()
+        ctx.arc(cx, cy, ring, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      ctx.beginPath()
+      ctx.moveTo(cx - r, cy)
+      ctx.lineTo(cx + r, cy)
+      ctx.moveTo(cx, cy - r)
+      ctx.lineTo(cx, cy + r)
+      ctx.stroke()
+      // live stick position
+      const st = getInputState()
+      const lx = st.axes[0] ?? 0
+      const ly = st.axes[1] ?? 0
+      const px = cx + lx * r
+      const py = cy + ly * r
+      const drift = Math.hypot(lx, ly)
+      ctx.beginPath()
+      ctx.arc(px, py, 7, 0, Math.PI * 2)
+      const col = drift > 0.15 ? '#f43f5e' : accent()
+      ctx.fillStyle = col
+      ctx.shadowColor = col
+      ctx.shadowBlur = 12
+      ctx.fill()
+      ctx.shadowBlur = 0
+      if (drift > 0.15) {
+        ctx.fillStyle = 'rgba(244,63,94,0.9)'
+        ctx.font = '700 10px Outfit, system-ui'
+        ctx.fillText(`drift ${Math.round(drift * 100)}%`, 6, 12)
+      }
+    }
+    raf = requestAnimationFrame(draw)
+    const unsub = subscribeInput(() => undefined)
+    return () => {
+      cancelAnimationFrame(raf)
+      unsub()
+    }
+  }, [])
+  return (
+    <div className="mt-2 flex items-center gap-3">
+      <canvas ref={canvasRef} width={120} height={120} className="rounded-2xl bg-black/30" />
+      <div className="text-[11px] leading-relaxed text-white/40">
+        Move the left stick slowly — the dot should rest still in the center.
+        Red = drift beyond 15% (raise the deadzone to compensate).
+      </div>
+    </div>
+  )
 }

@@ -1,6 +1,6 @@
 [package]
 name = "meshplay"
-version = "0.3.0"
+version = "0.4.0"
 description = "MESHplay — a gaming OS for your PC"
 authors = ["animeshy071-web"]
 edition = "2021"
@@ -20,6 +20,8 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 sysinfo = "0.33"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 trash = "5"
+tungstenite = "0.24"
+include_dir = "0.7"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
@@ -29,6 +31,8 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_Performance",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_Input_XboxController",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 
 [profile.release]

@@ -72,7 +72,27 @@ pub fn migrate(conn: &Connection) -> Result<(), String> {
         CREATE INDEX IF NOT EXISTS idx_states_game ON save_states(game_id);
         "#,
     )
-    .map_err(|e| format!("sqlite migrate failed: {e}"))
+    .map_err(|e| format!("sqlite migrate failed: {e}"))?;
+
+    // additive columns (safe re-runs): banner/logo art slots + genre tags
+    for (table, col, def) in [
+        ("games", "banner", "TEXT"),
+        ("games", "logo", "TEXT"),
+        ("games", "tags", "TEXT NOT NULL DEFAULT ''"),
+    ] {
+        let exists: bool = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .and_then(|mut stmt| {
+                stmt.query_map([], |row| row.get::<_, String>(1))
+                    .map(|mut rows| rows.any(|name| name.as_deref() == Ok(col)))
+            })
+            .map_err(|e| e.to_string())?;
+        if !exists {
+            conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {col} {def};"))
+                .map_err(|e| format!("sqlite alter failed: {e}"))?;
+        }
+    }
+    Ok(())
 }
 
 fn to_sql(v: &Value) -> Box<dyn ToSql> {

@@ -105,6 +105,14 @@ pub fn write_clip(dir: String, name: String, b64: String) -> Result<Value, Strin
     write_b64(&dir, &name, &b64)
 }
 
+/// Persist downloaded box art / banner / logo (base64) into the art folder.
+/// Returns the absolute path to store on the game row.
+#[tauri::command]
+pub fn write_art(app: AppHandle, name: String, b64: String) -> Result<Value, String> {
+    let dir = data_dir(&app).join("art");
+    write_b64(&dir.to_string_lossy(), &name, &b64)
+}
+
 fn write_b64(dir: &str, name: &str, b64: &str) -> Result<Value, String> {
     let dir = PathBuf::from(dir);
     std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir failed: {e}"))?;

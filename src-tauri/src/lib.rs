@@ -1,9 +1,8 @@
 // MESHplay native backend — everything the OS shell needs from Windows:
 // SQLite persistence, PE game identification, Steam library detection, ROM
 // scanning, native game launching/supervision, live system stats, storage ops,
-// display control, companion window, and OS-level mouse/volume input.
-//
-// 100% offline: no HTTP clients, no telemetry, no accounts.
+// display control, companion window, OS-level input injection, the embedded
+// LAN Remote Play server, Spotify OAuth callback, and power control.
 
 mod db;
 mod display;
@@ -12,7 +11,10 @@ mod launch;
 mod lnk;
 mod mouse;
 mod pe;
+mod power;
+mod remote;
 mod roms;
+mod spotify;
 mod steam;
 mod stats;
 
@@ -28,6 +30,8 @@ pub struct AppState {
     pub sys: Mutex<System>,
     pub last_stats: Mutex<stats::StatsCache>,
     pub children: Mutex<HashSet<u32>>,
+    pub remote: Mutex<Option<remote::RemoteServer>>,
+    pub spotify: Mutex<Option<spotify::SpotifyAuth>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -61,6 +65,8 @@ pub fn run() {
                 sys: Mutex::new(System::new()),
                 last_stats: Mutex::new(stats::StatsCache::default()),
                 children: Mutex::new(HashSet::new()),
+                remote: Mutex::new(None),
+                spotify: Mutex::new(None),
             });
             Ok(())
         })
@@ -98,6 +104,18 @@ pub fn run() {
             mouse::send_mouse_move,
             mouse::send_mouse_click,
             mouse::send_volume_key,
+            mouse::send_key,
+            power::system_sleep,
+            power::system_hibernate,
+            power::open_url,
+            power::vigem_status,
+            remote::remote_start,
+            remote::remote_status,
+            remote::remote_stop,
+            spotify::spotify_begin,
+            spotify::spotify_poll,
+            spotify::spotify_cancel,
+            fsops::write_art,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MESHplay");

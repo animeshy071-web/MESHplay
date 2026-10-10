@@ -44,10 +44,28 @@ pub fn set_display_mode(
     app: tauri::AppHandle,
     mode: String,
     monitor: Option<String>,
+    resolution: Option<(f64, f64)>,
 ) -> Result<(), String> {
     let win = app
         .get_webview_window("main")
         .ok_or("main window missing")?;
+
+    // target monitor: move + size to it first so fullscreen lands on the right panel
+    if let Some(target) = monitor {
+        if let Ok(monitors) = app.available_monitors() {
+            if let Some(m) = monitors.iter().find(|m| m.name() == Some(&target)) {
+                let _ = win.set_position(*m.position());
+                if mode != "windowed" {
+                    let size = m.size();
+                    let _ = win.set_size(tauri::LogicalSize::new(
+                        size.width as f64 / m.scale_factor(),
+                        size.height as f64 / m.scale_factor(),
+                    ));
+                }
+            }
+        }
+    }
+
     match mode.as_str() {
         "fullscreen" => {
             let _ = win.set_fullscreen(true);
@@ -62,15 +80,11 @@ pub fn set_display_mode(
             let _ = win.set_fullscreen(false);
             let _ = win.set_decorations(true);
             let _ = win.unmaximize();
-        }
-        _ => return Err(format!("unknown display mode: {mode}")),
-    }
-    if let Some(target) = monitor {
-        if let Ok(monitors) = app.available_monitors() {
-            if let Some(m) = monitors.iter().find(|m| m.name() == Some(&target)) {
-                let _ = win.set_position(*m.position());
+            if let Some((w, h)) = resolution {
+                let _ = win.set_size(tauri::LogicalSize::new(w, h));
             }
         }
+        _ => return Err(format!("unknown display mode: {mode}")),
     }
     Ok(())
 }

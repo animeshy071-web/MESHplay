@@ -4,7 +4,7 @@
 > dresses them in living color, and plays them with a controller, a phone, or a
 > steering wheel. Built to run at 60fps on any modern Windows PC.
 
-**Status**: planning complete · production starting (M1)
+**Status**: M1–M6 feature-complete · v0.4.0 (offline .exe/.msi shipped)
 **Owner**: @animeshy071-web · **Repo ritual**: push + tag after every milestone
 
 ---
@@ -219,9 +219,9 @@ Cloud-save sync (user's own Drive/WebDAV) · achievement auto-clips · save vers
 
 ## Milestone Tracker
 
-- [ ] **M1 — Console Shell & OS Settings Suite** (boot, wallpaper, dual scroller, detail, loading ring, CHIP-8, pause, toasts, sound synthesis, themes, FPS, full Profile/Audio/Video/System settings suite)
-- [ ] **M2 — Offline Phone Controller App** (standalone offline PWA/APK, QR/LAN/Hotspot, full gamepad UI, D-pad, sticks, triggers, wheel gyro, fightstick, haptics)
-- [ ] **M3 — Self-Building Library & Real PC Game Importer** (PE metadata game ID, custom .exe importer with art attachment, ROM scan/hash, Steam detection, universal search, Continue Playing)
-- [ ] **M4 — Deep Emulation & Floating In-Game Game Bar** (GB core, states, rewind, floating Game Bar with stats/mixer/filters/capture, RetroAchievements, Find My Controller, Mood Recommender)
-- [ ] **M5 — Universal Controller Layer** (remap, wheel/pedals, ViGEm virtual controller, anti-cheat detection)
-- [ ] **M6 — Ship & Polish (Offline Standalone PC App)** (Tauri .exe packaging & installer, 100% offline mode, Spotify, screensaver system, gallery, storage manager, diagnostics)
+- [x] **M1 — Console Shell & OS Settings Suite** (boot, wallpaper, dual scroller, detail, loading ring, CHIP-8, pause, toasts, sound synthesis, themes, FPS, full Profile/Audio/Video/System settings suite)
+- [x] **M2 — Offline Phone Controller App** (standalone offline PWA/APK, QR/LAN/Hotspot, full gamepad UI, D-pad diagonal glide, sticks, triggers, wheel gyro, fightstick, haptics, editable layout, **native Rust server in the packaged app**)
+- [x] **M3 — Self-Building Library & Real PC Game Importer** (PE metadata game ID, custom .exe importer with art attachment, ROM scan/hash + optional OpenVGDB dump, Steam detection, universal search, Continue Playing, **online art scrapers**)
+- [x] **M4 — Deep Emulation & Floating In-Game Game Bar** (GB core, states, rewind, floating Game Bar with stats/mixer/filters/capture, **RetroAchievements**, Find My Controller, **Mood Recommender**)
+- [x] **M5 — Universal Controller Layer** (gamepad→keyboard/mouse remap with OS injection, wheel/pedal mapping, ViGEm bridge status+guide, **anti-cheat auto-disable**)
+- [x] **M6 — Ship & Polish (Offline Standalone PC App)** (Tauri .exe/.msi packaging, 100% offline mode, **real Spotify Connect (PKCE)**, screensaver system, gallery, storage manager, diagnostics)

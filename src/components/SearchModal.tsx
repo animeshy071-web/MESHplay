@@ -7,9 +7,10 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   onSelectGame: (index: number) => void
+  onOpenMood?: () => void
 }
 
-export default function SearchModal({ isOpen, onClose, onSelectGame }: Props) {
+export default function SearchModal({ isOpen, onClose, onSelectGame, onOpenMood }: Props) {
   const [query, setQuery] = useState('')
 
   if (!isOpen) return null
@@ -60,6 +61,19 @@ export default function SearchModal({ isOpen, onClose, onSelectGame }: Props) {
             Esc
           </button>
         </div>
+
+        {/* Mood Mix entry */}
+        {onOpenMood && (
+          <button
+            onClick={() => {
+              sfx.select()
+              onOpenMood()
+            }}
+            className="mt-3 w-full rounded-2xl bg-gradient-to-r from-[var(--acc)]/25 to-[var(--acc2)]/20 px-4 py-2.5 text-left text-xs font-bold text-white/85 transition hover:from-[var(--acc)]/40 hover:to-[var(--acc2)]/35 cursor-pointer"
+          >
+            🎲 Don't know what to play? Try Mood Mix — tap a vibe, get a pick
+          </button>
+        )}
 
         {/* Results */}
         <div className="no-scrollbar mt-4 max-h-[50vh] overflow-y-auto space-y-1.5">

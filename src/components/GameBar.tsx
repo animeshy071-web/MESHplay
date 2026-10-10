@@ -40,6 +40,7 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
   const [states, setStates] = useState<Array<{ slot: string; thumb: string | null; at: number }>>([])
   const [rewindDepth, setRewindDepth] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'reset' | 'quit' | null>(null)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
 
   useEffect(() => perfSampler.subscribe(setSnap), [])
@@ -251,15 +252,35 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
           <div className="flex gap-2">
             <button
               className="rounded-full bg-white/8 px-3 py-1.5 text-[11px] font-bold text-white/70 transition hover:bg-white/15"
-              onClick={() => { sfx.select(); void api.softReset(); flash('↻ Soft reset'); onClose() }}
+              onClick={() => {
+                sfx.select()
+                if (confirmAction === 'reset') {
+                  setConfirmAction(null)
+                  void api.softReset()
+                  flash('↻ Soft reset')
+                  onClose()
+                } else {
+                  setConfirmAction('reset')
+                  window.setTimeout(() => setConfirmAction((c) => (c === 'reset' ? null : c)), 3000)
+                }
+              }}
             >
-              ↻ Reset
+              {confirmAction === 'reset' ? '↻ Sure?' : '↻ Reset'}
             </button>
             <button
               className="rounded-full bg-red-500/20 px-3 py-1.5 text-[11px] font-bold text-red-200 transition hover:bg-red-500/35"
-              onClick={() => { sfx.back(); void api.exit() }}
+              onClick={() => {
+                sfx.back()
+                if (confirmAction === 'quit') {
+                  setConfirmAction(null)
+                  void api.exit()
+                } else {
+                  setConfirmAction('quit')
+                  window.setTimeout(() => setConfirmAction((c) => (c === 'quit' ? null : c)), 3000)
+                }
+              }}
             >
-              ⏏ Quit to Dashboard
+              {confirmAction === 'quit' ? '⏏ Confirm quit' : '⏏ Quit to Dashboard'}
             </button>
           </div>
         </div>

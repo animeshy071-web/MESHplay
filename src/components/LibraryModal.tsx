@@ -3,10 +3,11 @@
 // deletion (Recycle Bin + confirm). Replaces the static M3 placeholder.
 
 import { useCallback, useEffect, useState } from 'react'
-import { getGames, identifyFile, scanSteam, scanRomFolder, removeGame, type Game, type RomScanResult, type SteamScanResult, type IdentifyResult } from '../system/library'
+import { getGames, identifyFile, scanSteam, scanRomFolder, removeGame, saveGame, type Game, type RomScanResult, type SteamScanResult, type IdentifyResult } from '../system/library'
 import { sfx } from '../system/mixer'
 import { invoke, isTauri, tryInvoke } from '../system/ipc'
 import { getPlaytime } from '../system/db'
+import { fetchArt, type ScrapeResult } from '../system/scrape'
 
 interface Props {
   isOpen: boolean
@@ -118,6 +119,26 @@ export default function LibraryModal({ isOpen, onClose, onSelectGame }: Props) {
     sfx.back()
   }
 
+  const doFetchArt = async (game: Game) => {
+    setScan({ busy: true, msg: `Fetching art for ${game.title}…` })
+    const res = (await fetchArt(game.title)) as ScrapeResult | { error: string }
+    if ('error' in res) {
+      setScan({ busy: false, msg: res.error })
+      sfx.error()
+      return
+    }
+    await saveGame({
+      id: game.id,
+      artPath: res.art ?? game.artPath,
+      bannerPath: res.banner ?? game.bannerPath,
+      logoPath: res.logo ?? game.logoPath,
+      colors: game.colors,
+    })
+    setScan({ busy: false, msg: `Art updated via ${res.source} ✓` })
+    sfx.chime()
+    void refresh()
+  }
+
   if (!isOpen) return null
 
   return (
@@ -190,6 +211,16 @@ export default function LibraryModal({ isOpen, onClose, onSelectGame }: Props) {
                 <div>{formatSecs(playtimes[g.id] ?? 0)}</div>
                 <div className="text-[10px] uppercase tracking-wide text-white/30">{g.source}</div>
               </div>
+              <button
+                className="rounded-full px-2 py-1 text-xs text-white/30 opacity-0 transition hover:bg-white/10 hover:text-emerald-300 group-hover:opacity-100"
+                title="Fetch box art / banner online (Steam keyless, optional keys)"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void doFetchArt(g)
+                }}
+              >
+                🌐
+              </button>
               <button
                 className="rounded-full px-2 py-1 text-xs text-white/30 opacity-0 transition hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
                 title="Remove (Recycle Bin, with confirm)"

@@ -74,7 +74,41 @@ export async function isOnBattery(): Promise<boolean> {
   return false
 }
 
-/** Sleep action: dim + minimize the window (wakes on any input). */
-export function sleepNow(minimize: () => void): void {
-  minimize()
+/** Real system sleep (standby) via the native backend. */
+export async function sleepNow(): Promise<boolean> {
+  if (isTauri()) {
+    const r = await tryInvoke<{ ok: boolean }>('system_sleep')
+    return r?.ok ?? false
+  }
+  return false
+}
+
+/** Real hibernate (S4). */
+export async function hibernateNow(): Promise<boolean> {
+  if (isTauri()) {
+    const r = await tryInvoke<{ ok: boolean }>('system_hibernate')
+    return r?.ok ?? false
+  }
+  return false
+}
+
+/** Open any URL / ms-settings page in the system browser (HDR, ViGEm guide…). */
+export async function openUrl(url: string): Promise<boolean> {
+  const r = await tryInvoke<{ ok: boolean }>('open_url', { url })
+  return r?.ok ?? false
+}
+
+/**
+ * Sleep timer: arms an idle watcher that puts the PC to standby after N
+ * minutes without input. Returns a disposer. Native only.
+ */
+export function armSleepTimer(minutes: number, isNativeRunning: () => boolean): () => void {
+  if (minutes <= 0) return () => undefined
+  const check = window.setInterval(() => {
+    if (isNativeRunning()) return
+    if (Date.now() - state.lastActivity >= minutes * 60_000) {
+      void sleepNow()
+    }
+  }, 15_000)
+  return () => window.clearInterval(check)
 }

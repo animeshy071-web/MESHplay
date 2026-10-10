@@ -2,6 +2,11 @@
 // relays phone input into the app as keyboard events — the same path the
 // physical gamepad bridge uses — so the phone drives the whole OS.
 
+import { useEffect, useState } from 'react'
+import { isTauri, tryInvoke } from '../system/ipc'
+import { osKey } from '../system/oskb'
+import { setPhoneWheel } from '../system/input'
+
 export type RemoteStatus = 'off' | 'connecting' | 'online' | 'error'
 
 export interface RemoteInfo {
@@ -40,8 +45,8 @@ class RemoteHost {
 
   start(): void {
     this.desired = true
-    void this.fetchInfo()
-    this.connect()
+    // fetch server info first so the host dials the right port
+    void this.fetchInfo().then(() => this.connect())
   }
 
   stop(): void {
@@ -62,6 +67,17 @@ class RemoteHost {
   }
 
   private async fetchInfo(): Promise<void> {
+    // Packaged app: the native Rust server binds the LAN and serves the PWA.
+    if (isTauri()) {
+      const info = await tryInvoke<RemoteInfo>('remote_start')
+      if (info?.url) {
+        this.emit({ info: { ...info, ok: true } })
+        return
+      }
+      this.emit({ info: { ok: false } })
+      return
+    }
+    // dev web mode: the Vite-plugin server
     try {
       const res = await fetch('http://127.0.0.1:8765/info', { cache: 'no-store' })
       const info = (await res.json()) as RemoteInfo
@@ -74,9 +90,10 @@ class RemoteHost {
   private connect(): void {
     if (!this.desired) return
     this.emit({ status: 'connecting' })
+    const port = this.state.info?.port ?? 8765
     let ws: WebSocket
     try {
-      ws = new WebSocket('ws://127.0.0.1:8765/ws?role=host')
+      ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=host`)
     } catch {
       this.emit({ status: 'error' })
       this.scheduleRetry()
@@ -116,7 +133,7 @@ class RemoteHost {
     }, 2000)
   }
 
-  private handle(msg: { type: string; players?: number[]; action?: string; code?: string; lx?: number; ly?: number; rx?: number; ry?: number; lt?: number; rt?: number; dx?: number; dy?: number; button?: string }): void {
+  private handle(msg: { type: string; players?: number[]; action?: string; code?: string; lx?: number; ly?: number; rx?: number; ry?: number; lt?: number; rt?: number; dx?: number; dy?: number; button?: string; gamma?: number }): void {
     if (msg.type === 'players' && Array.isArray(msg.players)) {
       this.emit({ players: msg.players })
       return
@@ -128,15 +145,21 @@ class RemoteHost {
         window.dispatchEvent(new CustomEvent('meshplay:gamebar-toggle', { detail: { source: 'phone-guide' } }))
         return
       }
-      window.dispatchEvent(
-        new KeyboardEvent(down ? 'keydown' : 'keyup', { code: msg.code, key: msg.code, bubbles: true, cancelable: true }),
-      )
+      // osKey: DOM event for the console + real OS injection while a native game runs
+      osKey(msg.code, down)
       return
     }
     if (msg.type === 'axes') {
-      // phone analog sticks + triggers feed the universal input layer
+      // phone analog sticks + analog triggers feed the universal input layer
       void import('../system/input').then(({ setPhoneAxes }) => {
-        setPhoneAxes([msg.lx ?? 0, msg.ly ?? 0, msg.rx ?? 0, msg.ry ?? 0])
+        setPhoneAxes([msg.lx ?? 0, msg.ly ?? 0, msg.rx ?? 0, msg.ry ?? 0, msg.lt ?? 0, msg.rt ?? 0])
+      })
+      return
+    }
+    if (msg.type === 'gyro') {
+      // wheel mode: gyro steering for the remap layer (native games)
+      void import('../system/input').then(({ setPhoneWheel }) => {
+        setPhoneWheel(msg.gamma ?? 0, true)
       })
       return
     }
@@ -161,8 +184,6 @@ class RemoteHost {
 }
 
 export const remoteHost = new RemoteHost()
-
-import { useEffect, useState } from 'react'
 
 export function useRemote(enabled: boolean): RemoteState {
   const [state, setState] = useState<RemoteState>(remoteHost['state'])
