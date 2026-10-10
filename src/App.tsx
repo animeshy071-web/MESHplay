@@ -16,10 +16,13 @@ import LoadingRing from './components/LoadingRing'
 import SpotifyDrawer from './components/SpotifyDrawer'
 import FileManagerModal from './components/FileManagerModal'
 import SearchModal from './components/SearchModal'
+import RemoteModal from './components/RemoteModal'
 import { GAMES, type GameDef } from './lib/games'
 import { getTheme, applyThemeVars } from './lib/themes'
-import { loadSettings, saveSettings, type Settings, type HomeMode } from './lib/settings'
-import { sfx, initAudio, setSoundEnabled } from './lib/sound'
+import { loadSettings, saveSettings, QUALITY_BACKGROUND_SCALE, QUALITY_WAVES_DETAIL, type Settings, type HomeMode } from './lib/settings'
+import { sfx, initAudio, setSoundEnabled, setVolume } from './lib/sound'
+import { getRecents } from './lib/playtime'
+import { remoteHost } from './lib/remote'
 import { createRepeater, type Repeater } from './lib/repeat'
 
 type View = 'boot' | 'home' | 'detail' | 'launching' | 'play' | 'settings'
@@ -32,26 +35,26 @@ export default function App() {
   const [isSpotifyOpen, setIsSpotifyOpen] = useState(false)
   const [isFilesOpen, setIsFilesOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isRemoteOpen, setIsRemoteOpen] = useState(false)
   const [settings, setSettings] = useState<Settings>(loadSettings)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [launchTarget, setLaunchTarget] = useState<typeof GAMES[number] | null>(null)
 
   const homeScrollRef = useRef<HTMLDivElement>(null)
+  const bootDoneRef = useRef(false)
   const launchTimer = useRef<number | null>(null)
   const toastId = useRef(0)
   const gamepadPrev = useRef<{ ax: boolean[]; btn: boolean[] }>({ ax: [], btn: [] })
   const navRepeat = useRef<Repeater | null>(null)
   if (!navRepeat.current) navRepeat.current = createRepeater(420, 190)
 
-  // Dedicated recent games history for Last Played option bar (independent from Crescent)
-  const [recentGames, setRecentGames] = useState<GameDef[]>(() => [
-    GAMES[0], // Space Invaders
-    GAMES[2], // Tetris
-    GAMES[1], // Brix
-    GAMES[4], // Blinky
-    GAMES[8], // Tron
-    GAMES[5], // Tank
-  ])
+  // Dedicated recent games history for Last Played option bar — real play data
+  const [recentGames, setRecentGames] = useState<GameDef[]>(() => {
+    const ids = getRecents()
+    const real = ids.map((id) => GAMES.find((g) => g.id === id)).filter((g): g is GameDef => !!g)
+    if (real.length > 0) return real.slice(0, 6)
+    return [GAMES[0], GAMES[2], GAMES[1], GAMES[4], GAMES[8], GAMES[5]]
+  })
   const [recentSel, setRecentSel] = useState<number>(0)
 
   const theme = getTheme(settings.theme)
@@ -64,8 +67,16 @@ export default function App() {
   useEffect(() => {
     applyThemeVars(settings.theme)
     setSoundEnabled(settings.sound)
+    setVolume(settings.uiVolume / 100)
     saveSettings(settings)
+    document.documentElement.dataset.motion = settings.reduceMotion ? 'reduced' : 'full'
   }, [settings])
+
+  // Remote Play server lifecycle (LAN WebSocket relay)
+  useEffect(() => {
+    if (settings.remoteEnabled) remoteHost.start()
+    else remoteHost.stop()
+  }, [settings.remoteEnabled])
 
   // Sync mode with defaultView when changed from settings
   useEffect(() => {
@@ -73,14 +84,17 @@ export default function App() {
   }, [settings.defaultView])
 
   useEffect(() => {
-    const onGesture = () => initAudio()
+    const onGesture = () => {
+      initAudio()
+      if (settings.sound) setVolume(settings.uiVolume / 100)
+    }
     window.addEventListener('keydown', onGesture)
     window.addEventListener('pointerdown', onGesture)
     return () => {
       window.removeEventListener('keydown', onGesture)
       window.removeEventListener('pointerdown', onGesture)
     }
-  }, [])
+  }, [settings.sound, settings.uiVolume])
 
   const toast = useCallback((msg: string) => {
     const id = ++toastId.current
@@ -124,8 +138,14 @@ export default function App() {
     sfx.launch()
     setLaunchTarget(g)
     setView('launching')
-    setRecentGames((prev) => [g, ...prev.filter((item) => item.id !== g.id)].slice(0, 6))
+    // real recents: persisted by the playtime store on session start
+    import('./lib/playtime').then(({ getRecents }) => {
+      const ids = getRecents()
+      const real = ids.map((id) => GAMES.find((item) => item.id === id)).filter((item): item is GameDef => !!item)
+      if (real.length > 0) setRecentGames(real.slice(0, 6))
+    })
     setRecentSel(0)
+    homeScrollRef.current?.scrollTo?.({ top: 0 })
     launchTimer.current = window.setTimeout(() => setView('play'), 1300)
   }, [sel])
 
@@ -134,9 +154,11 @@ export default function App() {
     setView('home')
   }, [])
 
-  // Keyboard routing
+  // Keyboard routing — any open drawer/modal swallows nav keys (no leaks underneath)
+  const overlayOpen = isSpotifyOpen || isFilesOpen || isSearchOpen || isRemoteOpen
   useEffect(() => {
     if (view !== 'home' && view !== 'detail' && view !== 'launching') return
+    if (overlayOpen) return
     const rep = navRepeat.current!
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return
@@ -163,6 +185,10 @@ export default function App() {
             } else if (e.code === 'KeyS') {
               e.preventDefault()
               openSettings()
+            } else if (e.code === 'KeyR') {
+              e.preventDefault()
+              sfx.select()
+              setIsRemoteOpen(true)
             } else if (e.code === 'KeyF') {
               e.preventDefault()
               setIsFilesOpen(true)
@@ -201,7 +227,7 @@ export default function App() {
       window.removeEventListener('keyup', onKeyUp)
       rep.stopAll()
     }
-  }, [view, mode, move, startLaunch, goHome, openSettings, switchMode])
+  }, [view, mode, overlayOpen, move, startLaunch, goHome, openSettings, switchMode])
 
   // Gamepad bridge + FPS meter loop
   const fpsElRef = useRef<HTMLSpanElement>(null)
@@ -305,7 +331,7 @@ export default function App() {
               zoom={1.0}
               height={5.5}
               fogDepth={15}
-              detail="medium"
+              detail={QUALITY_WAVES_DETAIL[settings.quality]}
               brightness={1.0}
               opacity={1.0}
               mouseInteraction={true}
@@ -316,7 +342,11 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <LiveBackground theme={theme} gameColors={wallpaperColors} />
+        <LiveBackground
+          theme={theme}
+          gameColors={wallpaperColors}
+          scale={QUALITY_BACKGROUND_SCALE[settings.quality]}
+        />
       )}
 
       {/* Cinematic Dark Vignette Overlay matching the reference UI */}
@@ -330,8 +360,16 @@ export default function App() {
         }}
       />
 
-      {/* Boot Screen */}
-      {view === 'boot' && <Boot onDone={() => setView('home')} />}
+      {/* Boot Screen (skippable in settings, and never replays when returning from a game) */}
+      {view === 'boot' && (
+        <Boot
+          onDone={() => {
+            bootDoneRef.current = true
+            setView('home')
+          }}
+          skip={!settings.bootAnimation || bootDoneRef.current}
+        />
+      )}
 
       {/* Top Bar (Universal across both modes) */}
       {view !== 'boot' && view !== 'play' && view !== 'launching' && (
@@ -425,7 +463,9 @@ export default function App() {
       )}
 
       {/* Gameplay View */}
-      {view === 'play' && launchTarget && <PlayView game={launchTarget} onExit={goHome} />}
+      {view === 'play' && launchTarget && (
+        <PlayView game={launchTarget} onExit={goHome} scanlines={settings.scanlines} smooth={settings.smoothScaling} />
+      )}
 
       {/* Settings Modal */}
       {view === 'settings' && (
@@ -434,6 +474,7 @@ export default function App() {
           onChange={setSettings}
           onBack={goHome}
           toast={toast}
+          onOpenRemote={() => setIsRemoteOpen(true)}
         />
       )}
 
@@ -449,6 +490,15 @@ export default function App() {
         onClose={() => setIsSearchOpen(false)}
         onSelectGame={(idx) => setSel(idx)}
       />
+      {isRemoteOpen && (
+        <RemoteModal
+          onClose={() => setIsRemoteOpen(false)}
+          enabled={settings.remoteEnabled}
+          onToggleEnabled={(v) => setSettings((s) => ({ ...s, remoteEnabled: v }))}
+        />
+      )}
+      {/* Quality: swap background engine cost on the fly */}
+      {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
 
       {/* Bottom Contextual Hints (shown in crescent mode or detail/play) */}
       {view !== 'boot' && mode === 'crescent' && <Hints items={hints} />}

@@ -108,6 +108,7 @@ export interface GrainientProps {
   centerX?: number
   centerY?: number
   zoom?: number
+  scale?: number
 }
 
 function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLShader {
@@ -126,7 +127,7 @@ export default function Grainient({
   rotationAmount = 500.0, noiseScale = 2.0,
   grainAmount = 0.1, grainScale = 2.0, grainAnimated = false,
   contrast = 1.5, gamma = 1.0, saturation = 1.0,
-  centerX = 0.0, centerY = 0.0, zoom = 0.9,
+  centerX = 0.0, centerY = 0.0, zoom = 0.9, scale = 0.5,
 }: GrainientProps) {
   const ref = useRef<HTMLCanvasElement>(null)
   const target = useRef({ c1: hexToRgb(color1), c2: hexToRgb(color2), c3: hexToRgb(color3) })
@@ -166,10 +167,9 @@ export default function Grainient({
       ga: U('uGrainAmount'), gs: U('uGrainScale'), gr: U('uGrainAnimated'),
     }
 
-    const SCALE = 0.5 // gradients don't need full res — halves GPU cost
     const resize = () => {
-      canvas.width = Math.max(2, Math.round(canvas.clientWidth * SCALE))
-      canvas.height = Math.max(2, Math.round(canvas.clientHeight * SCALE))
+      canvas.width = Math.max(2, Math.round(canvas.clientWidth * scale))
+      canvas.height = Math.max(2, Math.round(canvas.clientHeight * scale))
       gl.viewport(0, 0, canvas.width, canvas.height)
     }
     resize()

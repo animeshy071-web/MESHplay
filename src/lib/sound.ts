@@ -4,13 +4,14 @@
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let enabled = true
+let volume = 0.5
 
 export function initAudio(): void {
   if (ctx) return
   try {
     ctx = new AudioContext()
     master = ctx.createGain()
-    master.gain.value = 0.5
+    master.gain.value = enabled ? volume : 0
     master.connect(ctx.destination)
   } catch {
     ctx = null
@@ -19,6 +20,12 @@ export function initAudio(): void {
 
 export function setSoundEnabled(v: boolean): void {
   enabled = v
+  if (master) master.gain.value = v ? volume : 0
+}
+
+export function setVolume(v01: number): void {
+  volume = Math.min(1, Math.max(0, v01))
+  if (master) master.gain.value = enabled ? volume : 0
 }
 
 function tone(freq: number, dur: number, type: OscillatorType, gain: number, delay = 0, slideTo?: number): void {

@@ -2,18 +2,23 @@ import { useEffect, useRef, useState } from 'react'
 import { Chip8, KEY_MAP } from '../chip8/core'
 import type { GameDef } from '../lib/games'
 import { sfx } from '../lib/sound'
+import { beginSession, endSession } from '../lib/playtime'
 import LoadingRing from './LoadingRing'
 
 interface Props {
   game: GameDef
   onExit: () => void
+  scanlines: boolean
+  smooth: boolean
 }
 
 const CANVAS_W = 768
 const CANVAS_H = 384
 const CYCLES_PER_FRAME = 11
 
-export default function PlayView({ game, onExit }: Props) {
+const stateKey = (id: string, slot: string) => `meshplay.state.${id}.${slot}`
+
+export default function PlayView({ game, onExit, scanlines, smooth }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const coreRef = useRef<Chip8 | null>(null)
   const romRef = useRef<Uint8Array | null>(null)
@@ -22,6 +27,14 @@ export default function PlayView({ game, onExit }: Props) {
   const [paused, setPaused] = useState(false)
   const [pauseSel, setPauseSel] = useState(0)
   const [fps, setFps] = useState(60)
+  const [resumed, setResumed] = useState(false)
+
+  const PAUSE_ITEMS = ['Resume', 'Save State', 'Load State', 'Restart', 'Quit to Home']
+
+  useEffect(() => {
+    beginSession(game.id)
+    return () => endSession()
+  }, [game.id])
 
   useEffect(() => {
     let cancelled = false
@@ -29,7 +42,6 @@ export default function PlayView({ game, onExit }: Props) {
     let frames = 0
     let fpsT = performance.now()
 
-    // game audio: single square wave, gated by the sound timer (CHIP-8 beeper)
     let audioCtx: AudioContext | null = null
     let gain: GainNode | null = null
     try {
@@ -60,12 +72,11 @@ export default function PlayView({ game, onExit }: Props) {
       if (!ctx) return
       const px = img.data
       for (let i = 0; i < 64 * 32; i++) {
-        if (core.display[i]) {
-          px[i * 4] = 255
-          px[i * 4 + 1] = 255
-          px[i * 4 + 2] = 255
-          px[i * 4 + 3] = 255
-        }
+        const on = core.display[i]
+        px[i * 4] = on ? 255 : 0
+        px[i * 4 + 1] = on ? 255 : 0
+        px[i * 4 + 2] = on ? 255 : 0
+        px[i * 4 + 3] = on ? 255 : 0
       }
       offCtx.putImageData(img, 0, 0)
       ctx.imageSmoothingEnabled = false
@@ -125,22 +136,10 @@ export default function PlayView({ game, onExit }: Props) {
       if (!pausedRef.current) return
       if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
         e.preventDefault()
-        setPauseSel((s) => (e.code === 'ArrowUp' ? (s + 2) % 3 : (s + 1) % 3))
+        setPauseSel((s) => (e.code === 'ArrowUp' ? (s + PAUSE_ITEMS.length - 1) % PAUSE_ITEMS.length : (s + 1) % PAUSE_ITEMS.length))
       } else if (e.code === 'Enter' || e.code === 'Space') {
         e.preventDefault()
-        if (pauseSelRef.current === 0) {
-          sfx.select()
-          setPausedBoth(false)
-        } else if (pauseSelRef.current === 1) {
-          if (romRef.current) {
-            coreRef.current = new Chip8(romRef.current)
-            sfx.select()
-            setPausedBoth(false)
-          }
-        } else {
-          sfx.back()
-          onExitRef.current()
-        }
+        pauseActionRef.current(pauseSelRef.current)
       }
     }
 
@@ -157,7 +156,19 @@ export default function PlayView({ game, onExit }: Props) {
       .then((buf) => {
         if (cancelled) return
         romRef.current = new Uint8Array(buf)
-        coreRef.current = new Chip8(romRef.current)
+        const core = new Chip8(romRef.current)
+        coreRef.current = core
+        // Instant Resume: continue exactly where the last session ended
+        const auto = localStorage.getItem(stateKey(game.id, 'auto'))
+        if (auto) {
+          try {
+            core.restore(auto)
+            setResumed(true)
+            setTimeout(() => setResumed(false), 2200)
+          } catch {
+            /* corrupt state — fresh boot */
+          }
+        }
         setStatus('running')
         raf = requestAnimationFrame(step)
       })
@@ -171,6 +182,15 @@ export default function PlayView({ game, onExit }: Props) {
       window.removeEventListener('keydown', kd)
       window.removeEventListener('keyup', ku)
       if (audioCtx) void audioCtx.close()
+      // Instant Resume: freeze this exact moment for next time
+      const core = coreRef.current
+      if (core && romRef.current) {
+        try {
+          localStorage.setItem(stateKey(game.id, 'auto'), core.serialize())
+        } catch {
+          /* storage full — skip resume save */
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id])
@@ -181,18 +201,70 @@ export default function PlayView({ game, onExit }: Props) {
   const onExitRef = useRef(onExit)
   onExitRef.current = onExit
 
+  const pauseAction = (i: number) => {
+    const core = coreRef.current
+    if (i === 0) {
+      sfx.select()
+      pausedRef.current = false
+      setPaused(false)
+    } else if (i === 1 && core) {
+      try {
+        localStorage.setItem(stateKey(game.id, 'manual'), core.serialize())
+        sfx.select()
+      } catch {
+        sfx.error()
+      }
+    } else if (i === 2 && core) {
+      const st = localStorage.getItem(stateKey(game.id, 'manual'))
+      if (st) {
+        try {
+          core.restore(st)
+          sfx.select()
+          pausedRef.current = false
+          setPaused(false)
+        } catch {
+          sfx.error()
+        }
+      } else {
+        sfx.error()
+      }
+    } else if (i === 3 && romRef.current) {
+      coreRef.current = new Chip8(romRef.current)
+      localStorage.removeItem(stateKey(game.id, 'auto'))
+      setResumed(false)
+      sfx.select()
+      pausedRef.current = false
+      setPaused(false)
+    } else if (i === 4) {
+      sfx.back()
+      onExitRef.current()
+    }
+  }
+  const pauseActionRef = useRef(pauseAction)
+  pauseActionRef.current = pauseAction
+
   return (
     <div className="absolute inset-0 z-30 bg-black anim-fade-in">
       {status === 'running' && (
         <div className="flex h-full w-full flex-col items-center justify-center">
           <div className="relative">
-            <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} className="scanlines pixelated rounded-xl"
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_W}
+              height={CANVAS_H}
+              className={`${scanlines ? 'scanlines' : ''} ${smooth ? '' : 'pixelated'} rounded-xl`}
               style={{
-                width: 'min(88vw, 900px)', aspectRatio: '2 / 1',
+                width: 'min(88vw, 900px)',
+                aspectRatio: '2 / 1',
                 boxShadow: `0 0 80px -18px ${game.colors[0]}, 0 30px 80px -30px rgba(0,0,0,0.9)`,
               }}
             />
             <div className="absolute -top-9 left-1 text-sm font-bold text-white/60">{game.title.toUpperCase()}</div>
+            {resumed && (
+              <div className="absolute -top-9 right-1 rounded-full bg-[var(--acc)]/25 px-3 py-1 text-[11px] font-bold text-[var(--acc)] anim-fade-in">
+                ⟲ Resumed where you left off
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -212,18 +284,14 @@ export default function PlayView({ game, onExit }: Props) {
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 anim-fade-in" style={{ backdropFilter: 'blur(10px)' }}>
           <div className="glass w-[380px] rounded-3xl px-8 py-8">
             <div className="mb-6 text-center text-2xl font-black tracking-widest">PAUSED</div>
-            {['Resume', 'Restart', 'Quit to Home'].map((opt, i) => (
+            {PAUSE_ITEMS.map((opt, i) => (
               <div
                 key={opt}
                 className={`mb-2 cursor-pointer rounded-2xl px-6 py-3.5 text-center text-sm font-bold transition-all duration-200 ${
                   pauseSel === i ? 'bg-white/15 ring-2 ring-[var(--acc)]' : 'text-white/60'
                 }`}
                 onMouseEnter={() => setPauseSel(i)}
-                onClick={() => {
-                  if (i === 0) { pausedRef.current = false; setPaused(false) }
-                  else if (i === 1 && romRef.current) { coreRef.current = new Chip8(romRef.current); pausedRef.current = false; setPaused(false) }
-                  else onExit()
-                }}
+                onClick={() => pauseAction(i)}
               >
                 {opt}
               </div>

@@ -6,6 +6,7 @@ import type { Theme } from '../lib/themes'
 interface Props {
   theme: Theme
   gameColors: [string, string] | null
+  scale?: number
 }
 
 // The living wallpaper: Grainient (WebGL) driven by theme + focused-game
@@ -20,7 +21,7 @@ function hasWebGL(): boolean {
   }
 }
 
-export default function LiveBackground({ theme, gameColors }: Props) {
+export default function LiveBackground({ theme, gameColors, scale = 0.5 }: Props) {
   const [webgl, setWebgl] = useState<boolean | null>(null)
   useEffect(() => setWebgl(hasWebGL()), [])
 
@@ -36,6 +37,7 @@ export default function LiveBackground({ theme, gameColors }: Props) {
         color1={c1}
         color2={c2}
         color3={theme.bg1}
+        scale={scale}
         timeSpeed={0.25}
         warpStrength={1.0}
         warpFrequency={5.0}

@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react'
 
-export default function Boot({ onDone }: { onDone: () => void }) {
+export default function Boot({ onDone, skip = false }: { onDone: () => void; skip?: boolean }) {
   const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
+    if (skip) {
+      onDone()
+      return
+    }
     const t1 = setTimeout(() => setLeaving(true), 2200)
     const t2 = setTimeout(onDone, 2650)
-    const skip = () => onDone()
-    window.addEventListener('keydown', skip, { once: true })
+    const skipFn = () => onDone()
+    window.addEventListener('keydown', skipFn, { once: true })
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
-      window.removeEventListener('keydown', skip)
+      window.removeEventListener('keydown', skipFn)
     }
-  }, [onDone])
+  }, [onDone, skip])
+
+  if (skip) return null
 
   return (
     <div

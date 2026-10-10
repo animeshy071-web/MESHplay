@@ -107,3 +107,9 @@ button { outline: none; }
   animation: spin-slow 28s linear infinite;
 }
 
+/* Reduce motion: snappier UI, calmer motion everywhere */
+[data-motion="reduced"] * {
+  transition-duration: 0.15s !important;
+  animation-duration: 0.2s !important;
+}
+

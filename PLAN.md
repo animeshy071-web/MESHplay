@@ -82,41 +82,42 @@ colors) and the wallpaper blobs morph toward it.
 | Layer | Tech | Why |
 |---|---|---|
 | UI | React + TypeScript + Tailwind | fastest route to GOAT-tier UI; fully visually testable |
-| Shell | **Tauri (Rust)** | real Windows .exe, ~15MB, native FS/process/stats access, low RAM |
-| Emulation cores | TypeScript (CHIP-8) → Rust→WASM (Game Boy, later) | speed + portability (same cores later on phone) |
-| Sound | WebAudio synthesis | zero assets, frame-syncable |
-| Data | SQLite + JSON config | local library, playtime, saves, settings |
-| Phone remote | LAN WebSocket server (Tauri) + phone web page → later Capacitor app | no cloud, ~5–15ms latency |
-| External APIs | OpenVGDB/libretro (ROM identification), SteamGridDB (art/logos), Steam (PC game art), RAWG/IGDB (recommender), RetroAchievements | free-tier, no backend of ours |
-| Backend | **None for v1.** Later: tiny Cloudflare Worker to shield API keys; cloud sync via user's own storage | local-first privacy |
+| Shell & Native Host | **Tauri v2 (Rust)** | **100% offline standalone Windows .exe**, ~15MB, zero mandatory cloud, native FS/process/stats access, ultra-low RAM |
+| Emulation cores | TypeScript (CHIP-8) → Rust→WASM (Game Boy, later) | speed + portability (same cores later on phone), works fully offline |
+| Sound | WebAudio synthesis | zero external assets, procedural real-time synthesis, frame-syncable |
+| Data & Storage | SQLite + JSON config | local library, playtime logs, saves, settings, zero telemetry |
+| Phone remote | **Offline Phone App (PWA / Capacitor / APK)** + LAN WebSocket (Tauri) | **100% offline phone controller**, local Wi-Fi / hotspot / USB tethering, ~5–15ms latency, zero cloud relay |
+| Game ID & Scraping | PE Metadata Parser + OpenVGDB/libretro hash DB + SteamGridDB/Steam/IGDB | offline executable identification + local hash fallback + optional online art scraping |
+| Backend | **None.** Fully offline-first. Optional Cloudflare Worker for personal API key shielding | local-first privacy and complete standalone functionality |
 
 ## 4. Architecture
 
 ```
-┌────────────────────────── MESHplay.exe (Tauri/Rust) ──────────────────────────┐
-│                                                                              │
-│  ┌────────────── UI (React/TS, GPU-composited) ──────────────┐               │
-│  │ Boot → Home (crescent/row) → Detail → Loading ring → Play │               │
-│  │ Wave Wallpaper Engine (canvas, pooled, adaptive quality)  │               │
-│  │ Game Bar overlay · Guide overlay · Screensaver · Settings │               │
-│  └───────────────┬───────────────────────────────────────────┘               │
-│                  │                                                           │
-│  ┌───────────────┴───────────┐   ┌──────────────────────────┐               │
-│  │ Core Service (WASM/TS)    │   │ Platform Service (Rust)  │               │
-│  │ · CHIP-8, Game Boy        │   │ · ROM scan + hash ID     │               │
-│  │ · save states, rewind     │   │ · Steam/exe detection    │               │
-│  │ · filter pipeline         │   │ · process launch + stats │               │
-│  └───────────────────────────┘   │ · SQLite, config         │               │
-│                                  │ · ViGEm virtual pad (M5) │               │
-│  ┌───────────────────────────┐   └──────────────────────────┘               │
-│  │ LAN Remote Server         │   ┌──────────────────────────┐               │
-│  │ · QR pairing + token      │   │ Net Client (outbound)    │               │
-│  │ · input stream 60Hz       │◄──┤ · art/ID/achievements    │               │
-│  │ · gyro stream             │   │ · recommender APIs       │               │
-│  └───────────────────────────┘   └──────────────────────────┘               │
-└──────────────────────────────────────────────────────────────────────────────┘
-          ▲                                   ▲
-          │ controller / wheel (HID)          │ phone browser = gamepad over Wi-Fi
+┌────────────────────────── MESHplay.exe (Offline Windows Desktop Runtime) ──────────────────────────┐
+│                                                                                                    │
+│  ┌─────────────────────── UI (React/TS, GPU-Composited Console Firmware) ───────────────────────┐  │
+│  │ Boot → Home (crescent/row) → Detail → Loading ring → Play                                     │  │
+│  │ Wave Wallpaper Engine (WebGL2 / Canvas, pooled, adaptive quality)                             │  │
+│  │ Floating In-Game Game Bar (stats, mixer, filters, capture, states) · Guide · Settings        │  │
+│  └──────────────────────────────────────┬────────────────────────────────────────────────────────┘  │
+│                                         │                                                           │
+│  ┌──────────────────────────────────────┴───┐   ┌──────────────────────────────────────────────┐    │
+│  │ Core Service (WASM/TS, Offline)          │   │ Platform & Library Service (Rust Native)     │    │
+│  │ · CHIP-8, Game Boy engines               │   │ · Real PC Game Identification (PE headers)   │    │
+│  │ · Save states, continuous rewind buffer  │   │ · File Manager custom game importer (.exe)   │    │
+│  │ · Display filter pipeline (CRT/LCD/Sharp)│   │ · ROM scan + hash ID (OpenVGDB / libretro)   │    │
+│  └──────────────────────────────────────────┘   │ · Process lifecycle & playtime supervision   │    │
+│                                                 │ · SQLite database & settings manager         │    │
+│  ┌──────────────────────────────────────────┐   │ · ViGEm virtual controller driver (M5)       │    │
+│  │ LAN Remote Server (Offline)              │   └──────────────────────────────────────────────┘    │
+│  │ · Local Wi-Fi / Hotspot / USB connection │   ┌──────────────────────────────────────────────┐    │
+│  │ · QR pairing with local security token   │   │ Optional Net Scraper (Online Fallback)       │    │
+│  │ · 60Hz input stream + rumble haptics     │◄──┤ · SteamGridDB, Steam API, RAWG metadata      │    │
+│  │ · Dual-analog, D-pad, triggers & gyro    │   │ · RetroAchievements bridge                   │    │
+│  └──────────────────────────────────────────┘   └──────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────────────────────────────────────────────────────┘
+          ▲                                                           ▲
+          │ Physical controller / wheel / pedals (HID)                │ Offline Phone App (PWA/APK) over LAN
 ```
 
 ## 5. Security & Permissions Charter
@@ -124,65 +125,82 @@ colors) and the wallpaper blobs morph toward it.
 - No admin required to run (exception, once, at opt-in: ViGEm driver install in M5)
 - Reads Steam libraries **read-only** via official paths; scans only user-chosen folders
 - **Never deletes silently**: ROM removal → Recycle Bin + confirm; Steam uninstalls → Steam's own dialog; saves → storage manager + confirm
-- Game Bar for our games = native overlay; for launched PC games = companion always-on-top stats widget (no injection into other processes — antivirus-friendly)
+- Game Bar for our games = native overlay; for launched PC games = companion always-on-top floating stats widget (no injection into other processes — antivirus-friendly)
 - QR remote: one-time pairing token, LAN-bound, master kill-switch, traffic never leaves the home network
 - Controller→keyboard/mouse layer: single-player use; anti-cheat games marked unsupported, not fought
 - Zero telemetry. API keys local (later proxied). Unsigned exe shows one SmartScreen prompt until code-signed
 
 ## 6. Feature Inventory (screens × milestone)
 
-**M1 — The Console Shell**: boot placeholder → Home (crescent + row, switchable,
-default-in-settings) → Game Detail → loading ring → CHIP-8 gameplay (homebrew
-library) → pause overlay → toasts → wave wallpaper + per-game recolor → theme
-picker (5 gradients) → top bar (clock, avatar) → bottom hints → travel/select/
-back/error boops → FPS counter → empty state.
+**M1 — The Console Shell & Commercial OS Settings**:
+- Boot sequence → Home (crescent + row, switchable, default in settings) → Game Detail → loading ring → CHIP-8 gameplay → pause overlay → toasts → wave wallpaper + PS3 purple mode → top bar → bottom hints → sound synthesis → FPS counter → empty state.
+- **Commercial-Grade OS Settings Suite**:
+  - **Profile & Identity**: Custom gamertag, avatar selector, custom bio, player badges, total hours played, trophies count, local PIN lock.
+  - **Audio & Volume Control**: Master volume slider, UI sound effects volume slider, game volume slider, audio output device selector (Headphones / Speakers), spatial audio toggle, mute-on-window-blur toggle.
+  - **Display & Graphics**: Fullscreen / Borderless Windowed / Windowed modes, resolution selector, display monitor selector, target FPS limit (30, 60, 120, uncapped), V-Sync toggle, HDR toggle.
+  - **Power & System**: Sleep timer (15m, 30m, 1h, never), screen dimming on idle, Start with Windows toggle, auto-launch in fullscreen, laptop battery-saver mode.
+  - **Controller & Input Calibration**: Analog stick deadzone calibration, rumble/vibration intensity slider, button mapping visualizer, auto-switch between gamepad and mouse.
+  - **Storage & Data Management**: Storage analyzer (Games, Saves, Screenshots, Cache breakdown), save state export/import to ZIP, cache cleaner, safe deletion routing.
 
-**M2 — Phone Controller**: QR pairing screen, LAN server + pairing token,
-controller skin page (D-pad/ABXY/sticks/shoulders), 60Hz input stream, player
-slots (P1–P4), controller test screen, haptics.
+**M2 — Offline Phone Controller App**:
+- **100% Offline Mobile App** (Installable PWA & standalone Capacitor APK): zero internet required, pairs over local Wi-Fi, mobile hotspot, or direct USB tethering.
+- **Complete Controller UI Suite**:
+  - **Standard Gamepad**: Ergonomic D-Pad with diagonal glide, tactile ABXY action cluster, dual analog thumbsticks with clickable L3/R3, shoulder bumpers (L1/R1) and analog triggers (L2/R2), Select, Start, Guide/Home.
+  - **Steering Wheel Mode**: Gyroscope tilt-to-steer steering wheel with on-screen brake/gas pedals and paddle shifters.
+  - **Arcade Fight-Stick Mode**: 6-button arcade layout for fighting games.
+  - **Trackpad / Mouse Mode**: Touchpad surface for mouse cursor navigation in PC games.
+  - **Customizer & Haptics**: Button repositioning, scale customization, and device rumble haptics slider.
+- QR pairing screen with local token handshake, player slots (P1–P4), controller hardware tester.
 
-**M3 — The Self-Building Library**: folder scan + ROM hash identification,
-cover/logo/art fetch, Steam detection + launch, platform chips + badges,
-Continue Playing row, universal search, Surprise Me, playtime tracking,
-first-run onboarding (theme → folder → controller check).
+**M3 — The Self-Building Library & Real PC Game Importer**:
+- **Real-World PC Game Identification Engine**:
+  - Native file manager importer: pick any `.exe`, `.lnk`, `.bat`, or folder.
+  - PE header binary parser: reads executable metadata (`FileDescription`, `ProductName`, `CompanyName`, version info, embedded PE icons).
+  - Offline name normalization & local hash database match + online scrapers (Steam, SteamGridDB, IGDB) when connected.
+  - Custom game addition dialog: edit title, attach custom box art/banner/logo, add custom launch arguments, set custom working directories, and pair emulator cores.
+- Automated ROM folder scan + hash ID (OpenVGDB / libretro), Steam library auto-detection (read-only VDF parsing), platform filter chips & badges, Continue Playing row, universal search, Surprise Me, playtime tracking, first-run onboarding.
 
-**M4 — Deep Emulation + Game Bar**: Game Boy core (Rust→WASM), save states,
-Instant Resume, rewind, Game Bar overlay (stats, filters CRT/HD, audio mixer,
-screenshot, states), launch preloader (hover-precaching), achievement popups
-via RetroAchievements (CHIP-8 + GB), **Find My Controller** easter egg (sonar
-rumble + radar screen), **Mood Recommender** (mood chips + free text → RAWG/IGDB
-→ play-from-shelf mode).
+**M4 — Deep Emulation & Floating In-Game Game Bar**:
+- **Floating In-Game Game Bar**:
+  - Activated during gameplay via controller Guide button (`Xbox`/`PS`), controller shortcut (`L1+R1+Select`), or keyboard (`Win+G`, `Shift+Tab`, `Esc`).
+  - Floating translucent glass HUD with movable widgets:
+    - **Real-Time Performance Monitor**: FPS counter, frame-time graph, CPU, GPU, RAM, battery percentage.
+    - **Multi-Channel Audio Mixer**: Master volume, Game sound, Spotify playback, and Voice chat sliders.
+    - **Quick State Manager**: Fast Save, Load, and visual thumbnail state slots.
+    - **Real-Time Rewind Slider**: Rewind gameplay seamlessly up to 60 seconds backwards.
+    - **Retro Display Filters**: Instant switcher between CRT Scanlines, LCD Grid, Sharp Nearest-Neighbor, and Smooth Bilinear.
+    - **Media Capture**: One-tap screenshot capture and instant 30-second video replay buffer.
+    - **Controller Status**: Battery gauge and connected player indicators (P1–P4).
+    - **Exit & Reset**: Soft reset game, hard reset, or quit to dashboard with confirmation.
+- Game Boy core (Rust→WASM), save states, Instant Resume, launch preloader (hover-precaching), RetroAchievements integration, **Find My Controller** easter egg (sonar rumble + radar), **Mood Recommender** (mood chips + free text → RAWG/IGDB).
 
-**M5 — Universal Controller Layer**: any gamepad → keyboard/mouse remapping,
-per-game profiles, wheel/pedal mapping + wheel navigates the UI, ViGEm virtual
-pad for launched PC games, anti-cheat game detection & labeling.
+**M5 — Universal Controller Layer**:
+- Any gamepad → keyboard/mouse remapping, per-game profiles, wheel/pedal mapping + wheel navigates UI, ViGEm virtual controller driver for launched PC games, anti-cheat game detection & labeling.
 
-**M6 — Ship & Polish**: Tauri packaging + installer, **Spotify connection**
-(now-playing chip, in-game mixer control, Spotify-device throw — Premium required
-for control/playback), **screensaver system** (music mode w/ art drift → clock
-mode w/ gradient waves → attract reels), themes unlockables, screenshots
-gallery, storage manager, profile & playtime stats, laptop/battery mode, Windows
-game mode toggle, controller health (drift test), bedtime wind-down, konami code.
+**M6 — Ship & Polish (Offline Standalone Windows App)**:
+- **Offline Standalone Windows .exe**: Tauri packaging + standalone MSI/EXE installer with all runtimes bundled; runs 100% offline out of the box with zero dependencies.
+- **Spotify connection** (now-playing chip, in-game mixer control, Spotify-device throw — Premium required for control/playback), **screensaver system** (music mode w/ art drift → clock mode w/ gradient waves → attract reels), themes unlockables, screenshots gallery, storage manager, profile & playtime stats, laptop/battery mode, Windows game mode toggle, controller health (drift test), bedtime wind-down, konami code.
 
 ### Personal features (user-specified, sacred)
-1. **Find My Controller** — PC pings lost controller: rumble bursts + PC sonar + radar UI naming its port (browser can rumble; pad can't self-beep — rumble+screen+sound instead)
-2. **Mood Recommender** — type a mood or tap chips → internet game database → recommendations; also "play one from your shelf" mode
-3. **Gyro** — phone motion sensors over the remote link: tilt-to-steer + gyro-as-mouse; iOS shows a one-tap motion permission
+1. **Offline Standalone Windows App** — One self-contained `.exe` installer, 100% offline functionality, embedded database, zero account required.
+2. **Offline Phone Controller App** — Complete console controller UI over local network / hotspot (D-pad, ABXY, dual sticks, triggers, wheel gyro, fightstick, trackpad).
+3. **Real PC Game Identifier & Custom Importer** — Extracts real executable metadata, embedded icons, supports custom box art attachment and launch args.
+4. **Floating In-Game Game Bar** — Overlay summoned via Guide button with stats, audio mixer, save states, rewind, filters, and capture.
+5. **Commercial-Grade OS Settings Suite** — Complete profile, multi-channel volume, display/resolution, power, input calibration, and storage controls.
+6. **Find My Controller** — PC pings lost controller: rumble bursts + PC sonar + radar UI naming its port.
+7. **Mood Recommender** — type a mood or tap chips → internet game database → recommendations; also "play one from your shelf" mode.
+8. **Gyro** — phone motion sensors over the remote link: tilt-to-steer + gyro-as-mouse; iOS shows a one-tap motion permission.
 
 ## 7. QA Process (per milestone)
 
-1. **Machine QA (agent)**: every screen screenshotted and reviewed; frame-time
-   profiling on the wave engine and scrollers; adaptive-quality ladder verified;
-   sounds triggered on correct frames
-2. **Human QA (owner)**: feel test — boop timing, curve tightness, wave speed,
-   controller ergonomics; tuning requests → agent implements
+1. **Machine QA (agent)**: every screen screenshotted and reviewed; frame-time profiling on the wave engine and scrollers; adaptive-quality ladder verified; sounds triggered on correct frames
+2. **Human QA (owner)**: feel test — boop timing, curve tightness, wave speed, controller ergonomics; tuning requests → agent implements
 3. Definition of Done = machine QA green + owner feel-signoff
 
 ## 8. Repo Ritual (every milestone)
 
 - Branch: `main` only during solo build; conventional commits (`feat:`, `fix:`, `docs:`)
-- Milestone end → version tag (`v0.1.0-m1`, `v0.2.0-m2`, …) → push → GitHub
-  Release with notes + screenshots
+- Milestone end → version tag (`v0.1.0-m1`, `v0.2.0-m2`, …) → push → GitHub Release with notes + screenshots
 - `PLAN.md` checkbox tables updated at each milestone close
 - Never commit secrets/keys/ROMs (homebrew ROMs are committed — they're free)
 
@@ -195,18 +213,15 @@ game mode toggle, controller health (drift test), bedtime wind-down, konami code
 - Emulated-game legality: MESHplay ships no commercial ROMs, ever
 
 ## 10. Smart Backlog (post-M6 pulls)
-Cloud-save sync (user's own Drive/WebDAV) · achievement auto-clips · save
-versioning rollback · time-aware suggestions (HowLongToBeat) · backlog radar ·
-smart ROM scanner (corrupt/dup/region/fan-translation flags) · weekly recap ·
-"continue on phone" state handoff · voice search · second-screen phone apps.
+Cloud-save sync (user's own Drive/WebDAV) · achievement auto-clips · save versioning rollback · time-aware suggestions (HowLongToBeat) · backlog radar · smart ROM scanner (corrupt/dup/region/fan-translation flags) · weekly recap · "continue on phone" state handoff · voice search · second-screen phone apps.
 
 ---
 
 ## Milestone Tracker
 
-- [ ] **M1 — Console Shell** (boot, wallpaper, dual scroller, detail, loading ring, CHIP-8, pause, toasts, 4 boops, themes, FPS)
-- [ ] **M2 — Phone Controller** (QR, LAN, gamepad skin, gyro)
-- [ ] **M3 — Self-Building Library** (scan/ID/art, Steam, search, Continue Playing, onboarding)
-- [ ] **M4 — Deep Emulation + Game Bar** (GB core, states, rewind, achievements, Find My Controller, Mood Recommender)
-- [ ] **M5 — Universal Controller Layer** (remap, wheel, ViGEm)
-- [ ] **M6 — Ship & Polish** (packaging, Spotify, screensaver, gallery, stats, unlockables)
+- [ ] **M1 — Console Shell & OS Settings Suite** (boot, wallpaper, dual scroller, detail, loading ring, CHIP-8, pause, toasts, sound synthesis, themes, FPS, full Profile/Audio/Video/System settings suite)
+- [ ] **M2 — Offline Phone Controller App** (standalone offline PWA/APK, QR/LAN/Hotspot, full gamepad UI, D-pad, sticks, triggers, wheel gyro, fightstick, haptics)
+- [ ] **M3 — Self-Building Library & Real PC Game Importer** (PE metadata game ID, custom .exe importer with art attachment, ROM scan/hash, Steam detection, universal search, Continue Playing)
+- [ ] **M4 — Deep Emulation & Floating In-Game Game Bar** (GB core, states, rewind, floating Game Bar with stats/mixer/filters/capture, RetroAchievements, Find My Controller, Mood Recommender)
+- [ ] **M5 — Universal Controller Layer** (remap, wheel/pedals, ViGEm virtual controller, anti-cheat detection)
+- [ ] **M6 — Ship & Polish (Offline Standalone PC App)** (Tauri .exe packaging & installer, 100% offline mode, Spotify, screensaver system, gallery, storage manager, diagnostics)

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>MESHplay Remote</title>
+<style>
+  :root {
+    --acc: #a855f7; --acc2: #7c3aed;
+    --glass: rgba(255,255,255,0.07);
+    --edge: rgba(255,255,255,0.10);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: radial-gradient(140% 100% at 50% 0%, #1d1235 0%, #0b0714 55%, #050308 100%);
+    color: #fff;
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .wrap {
+    height: 100%; display: flex; flex-direction: column;
+    padding: max(14px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 12px; }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--acc), var(--acc2));
+    font-weight: 800; font-size: 17px;
+    box-shadow: 0 0 22px -4px var(--acc);
+  }
+  .brand b { font-size: 16px; font-weight: 800; letter-spacing: 0.01em; }
+  .brand span { color: var(--acc); }
+  .status {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--glass); border: 1px solid var(--edge);
+    padding: 7px 13px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #f43f5e; transition: background 0.3s; }
+  .dot.on { background: #34d399; box-shadow: 0 0 10px #34d399; }
+
+  .stage { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; }
+  .shoulders { display: flex; justify-content: space-between; padding: 0 6px; }
+  .main { display: flex; align-items: center; justify-content: space-between; }
+  .center { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+  .btn {
+    display: grid; place-items: center;
+    background: var(--glass); border: 1px solid var(--edge);
+    color: #fff; border-radius: 50%;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    font-weight: 700; touch-action: none;
+    transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease;
+  }
+  .btn.press {
+    transform: scale(0.92);
+    background: rgba(168, 85, 247, 0.35);
+    box-shadow: 0 0 26px -4px var(--acc);
+  }
+  .dpad { position: relative; width: 168px; height: 168px; }
+  .dpad .btn { position: absolute; width: 58px; height: 58px; font-size: 19px; }
+  .dpad .up    { left: 55px; top: 0; }
+  .dpad .down  { left: 55px; bottom: 0; }
+  .dpad .left  { left: 0; top: 55px; }
+  .dpad .right { right: 0; top: 55px; }
+  .dpad .mid {
+    left: 55px; top: 55px; width: 58px; height: 58px;
+    background: transparent; border: 1px dashed rgba(255,255,255,0.12); pointer-events: none;
+  }
+  .abxy { position: relative; width: 176px; height: 176px; }
+  .abxy .btn { position: absolute; width: 62px; height: 62px; font-size: 17px; }
+  .abxy .a { right: 0; top: 57px; color: #86efac; }
+  .abxy .b { right: 57px; bottom: 0; color: #fda4af; }
+  .abxy .x { left: 57px; top: 0; color: #93c5fd; }
+  .abxy .y { left: 0; top: 57px; color: #fcd34d; }
+  .lb, .rb { width: 84px; height: 42px; border-radius: 999px; font-size: 13px; letter-spacing: 0.06em; }
+  .pill {
+    height: 34px; padding: 0 18px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .gyro {
+    height: 38px; padding: 0 16px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .gyro.on { background: rgba(52, 211, 153, 0.25); box-shadow: 0 0 20px -6px #34d399; border-color: rgba(52,211,153,0.5); }
+  .player {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+  .overlay {
+    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+    background: rgba(5,3,8,0.82); backdrop-filter: blur(14px); text-align: center; padding: 30px;
+  }
+  .overlay h2 { font-size: 21px; font-weight: 800; margin: 0 0 8px; }
+  .overlay p { font-size: 13px; color: rgba(255,255,255,0.55); margin: 0; line-height: 1.6; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">M</div><b>MESH<span>play</span></b></div>
+    <div class="status"><div class="dot" id="dot"></div><span id="statusText">Connecting…</span></div>
+  </header>
+
+  <div class="stage">
+    <div class="shoulders">
+      <div class="btn lb" data-code="ArrowLeft">LB</div>
+      <div class="btn rb" data-code="ArrowRight">RB</div>
+    </div>
+
+    <div class="main">
+      <div class="dpad">
+        <div class="btn up" data-code="ArrowUp">▲</div>
+        <div class="btn left" data-code="ArrowLeft">◀</div>
+        <div class="btn mid"></div>
+        <div class="btn right" data-code="ArrowRight">▶</div>
+        <div class="btn down" data-code="ArrowDown">▼</div>
+      </div>
+
+      <div class="center">
+        <div class="player" id="playerBadge">—</div>
+        <div class="btn pill" data-code="Tab">View</div>
+        <div class="btn pill" data-code="Escape">Menu</div>
+        <div class="btn gyro" id="gyroBtn">Gyro Off</div>
+      </div>
+
+      <div class="abxy">
+        <div class="btn x" data-code="KeyX">X</div>
+        <div class="btn y" data-code="Tab">Y</div>
+        <div class="btn a" data-code="Enter">A</div>
+        <div class="btn b" data-code="Escape">B</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="connectOverlay">
+  <div>
+    <h2 id="ovTitle">Pairing with MESHplay…</h2>
+    <p id="ovText">Keep this screen open — the connection starts automatically.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var params = new URLSearchParams(location.search)
+  var token = params.get('t') || ''
+  var ws = null
+  var retryT = null
+  var gyroOn = false
+  var gyroState = { left: false, right: false }
+
+  var dot = document.getElementById('dot')
+  var statusText = document.getElementById('statusText')
+  var playerBadge = document.getElementById('playerBadge')
+  var overlay = document.getElementById('connectOverlay')
+  var ovTitle = document.getElementById('ovTitle')
+  var ovText = document.getElementById('ovText')
+
+  function buzz(ms) { if (navigator.vibrate) navigator.vibrate(ms || 8) }
+
+  function setStatus(on, text) {
+    dot.classList.toggle('on', on)
+    statusText.textContent = text
+  }
+
+  function send(obj) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj))
+  }
+
+  function connect() {
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    ws = new WebSocket(proto + '//' + location.host + '/ws?role=phone&t=' + encodeURIComponent(token))
+
+    ws.onopen = function () {
+      setStatus(true, 'Connected')
+      overlay.classList.add('hidden')
+    }
+    ws.onmessage = function (ev) {
+      try {
+        var m = JSON.parse(ev.data)
+        if (m.type === 'welcome') {
+          playerBadge.textContent = 'Player ' + m.player
+          buzz(20)
+        } else if (m.type === 'rumble') {
+          buzz(m.ms || 300)
+        }
+      } catch (e) {}
+    }
+    ws.onclose = function (ev) {
+      setStatus(false, 'Reconnecting…')
+      if (ev.code === 4001) {
+        overlay.classList.remove('hidden')
+        ovTitle.textContent = 'Pairing failed'
+        ovText.textContent = 'This code expired. Scan the QR on MESHplay again.'
+        return
+      }
+      if (ev.code === 4002) {
+        overlay.classList.remove('hidden')
+        ovTitle.textContent = 'All slots taken'
+        ovText.textContent = 'Four phones are already connected to this MESHplay.'
+        return
+      }
+      retryT = setTimeout(connect, 1500)
+    }
+    ws.onerror = function () { try { ws.close() } catch (e) {} }
+  }
+
+  // ---- button input ----
+  function down(el, code) {
+    el.classList.add('press')
+    buzz(8)
+    send({ type: 'input', action: 'down', code: code })
+  }
+  function up(el, code) {
+    el.classList.remove('press')
+    send({ type: 'input', action: 'up', code: code })
+  }
+
+  document.querySelectorAll('.btn[data-code]').forEach(function (el) {
+    var code = el.getAttribute('data-code')
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      el.setPointerCapture(e.pointerId)
+      down(el, code)
+    })
+    el.addEventListener('pointerup', function (e) { e.preventDefault(); up(el, code) })
+    el.addEventListener('pointercancel', function () { up(el, code) })
+    el.addEventListener('contextmenu', function (e) { e.preventDefault() })
+  })
+
+  // ---- gyro steering ----
+  var gyroBtn = document.getElementById('gyroBtn')
+  gyroBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault()
+    if (!gyroOn) {
+      var enable = function () {
+        gyroOn = true
+        gyroBtn.classList.add('on')
+        gyroBtn.textContent = 'Gyro On'
+        window.addEventListener('deviceorientation', onTilt, true)
+      }
+      if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
+        DeviceOrientationEvent.requestPermission().then(function (r) { if (r === 'granted') enable() }).catch(function () {})
+      } else if ('DeviceOrientationEvent' in window) {
+        enable()
+      }
+    } else {
+      gyroOn = false
+      gyroBtn.classList.remove('on')
+      gyroBtn.textContent = 'Gyro Off'
+      window.removeEventListener('deviceorientation', onTilt, true)
+      if (gyroState.left) { gyroState.left = false; send({ type: 'input', action: 'up', code: 'ArrowLeft' }) }
+      if (gyroState.right) { gyroState.right = false; send({ type: 'input', action: 'up', code: 'ArrowRight' }) }
+    }
+  })
+
+  function onTilt(ev) {
+    if (!gyroOn) return
+    var g = ev.gamma || 0 // left/right tilt degrees
+    var wantLeft = g < -14
+    var wantRight = g > 14
+    if (wantLeft !== gyroState.left) {
+      gyroState.left = wantLeft
+      send({ type: 'input', action: wantLeft ? 'down' : 'up', code: 'ArrowLeft' })
+    }
+    if (wantRight !== gyroState.right) {
+      gyroState.right = wantRight
+      send({ type: 'input', action: wantRight ? 'down' : 'up', code: 'ArrowRight' })
+    }
+    send({ type: 'gyro', gamma: g, beta: ev.beta || 0 })
+  }
+
+  // stay awake if the browser supports it
+  var wakeLock = null
+  if (navigator.wakeLock) {
+    navigator.wakeLock.request('screen').then(function (wl) { wakeLock = wl }).catch(function () {})
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && navigator.wakeLock && !wakeLock) {
+        navigator.wakeLock.request('screen').then(function (wl) { wakeLock = wl }).catch(function () {})
+      }
+    })
+  }
+
+  window.addEventListener('beforeunload', function () {
+    clearTimeout(retryT)
+    if (ws) try { ws.close(1000) } catch (e) {}
+  })
+
+  connect()
+})()
+</script>
+</body>
+</html>

@@ -203,4 +203,31 @@ export class Chip8 {
       this.soundOn = false
     }
   }
+
+  serialize(): string {
+    return JSON.stringify({
+      mem: Array.from(this.mem),
+      v: Array.from(this.v),
+      stack: Array.from(this.stack),
+      display: Array.from(this.display),
+      keys: Array.from(this.keys),
+      i: this.i, pc: this.pc, sp: this.sp,
+      delay: this.delay, sound: this.sound,
+    })
+  }
+
+  restore(json: string): void {
+    const s = JSON.parse(json)
+    this.mem.set(s.mem)
+    this.v.set(s.v)
+    this.stack.set(s.stack)
+    this.display.set(s.display)
+    this.keys.set(s.keys)
+    this.i = s.i
+    this.pc = s.pc
+    this.sp = s.sp
+    this.delay = s.delay
+    this.sound = s.sound
+    this.drawFlag = true
+  }
 }
