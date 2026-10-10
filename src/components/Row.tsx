@@ -110,34 +110,6 @@ export default function Row({
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col justify-end overflow-hidden px-14 pb-7 select-none anim-fade-in font-sans">
-      {/* Dynamic Glowing Xbox Wave Ribbons in Upper Background */}
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-45"
-        viewBox="0 0 1536 776"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M-50 220 C300 260, 600 130, 950 230 C1300 330, 1400 490, 1600 450"
-          stroke="var(--acc, #22c55e)"
-          strokeWidth="3.5"
-          strokeOpacity="0.85"
-          filter="drop-shadow(0 0 16px var(--acc, #22c55e))"
-        />
-        <path
-          d="M-80 350 C280 410, 580 270, 920 350 C1260 430, 1450 630, 1620 590"
-          stroke="#4ade80"
-          strokeWidth="1.8"
-          strokeOpacity="0.5"
-          filter="drop-shadow(0 0 12px #4ade80)"
-        />
-        <path
-          d="M100 90 C400 150, 750 50, 1050 150 C1350 250, 1480 390, 1650 370"
-          stroke="rgba(255, 255, 255, 0.2)"
-          strokeWidth="1.2"
-          strokeDasharray="6 6"
-        />
-      </svg>
 
       {/* ─────────────────────────────────────────────────────────────
           ROW 1: Horizontal Game Squircle Tiles (1:1 Ratio)

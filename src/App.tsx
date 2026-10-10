@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import LiveBackground from './components/LiveBackground'
+import GradientWaves from './components/GradientWaves'
 import TopBar from './components/TopBar'
 import Hints, { type HintItem } from './components/Hints'
 import Toasts, { type Toast } from './components/Toasts'
@@ -286,8 +287,37 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#050308]">
-      {/* Living Adaptive WebGL/Wave Wallpaper */}
-      <LiveBackground theme={theme} gameColors={wallpaperColors} />
+      {/* Background: In horizontal mode, use stable PS3 lightest brightest purple GradientWaves; in crescent mode, use adaptive LiveBackground */}
+      {mode === 'row' && view === 'home' ? (
+        <div className="absolute inset-0 z-0 overflow-hidden bg-[#090314]">
+          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <GradientWaves
+              horizonColor="#5227FF"
+              waveColor="#FF9FFC"
+              crestColor="#FFFFFF"
+              speed={0.4}
+              amplitude={2.5}
+              waveScale={0.6}
+              waveRatio={0.9}
+              swell={35}
+              turbulence={20}
+              tilt={1.11}
+              zoom={1.0}
+              height={5.5}
+              fogDepth={15}
+              detail="medium"
+              brightness={1.0}
+              opacity={1.0}
+              mouseInteraction={true}
+              parallaxStrength={0.5}
+              grain={true}
+              grainIntensity={0.05}
+            />
+          </div>
+        </div>
+      ) : (
+        <LiveBackground theme={theme} gameColors={wallpaperColors} />
+      )}
 
       {/* Cinematic Dark Vignette Overlay matching the reference UI */}
       <div
@@ -295,7 +325,7 @@ export default function App() {
         style={{
           background:
             mode === 'row'
-              ? 'radial-gradient(130% 110% at 50% 30%, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%), linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 40%)'
+              ? 'linear-gradient(to top, rgba(9,3,20,0.92) 0%, rgba(9,3,20,0.42) 38%, transparent 70%)'
               : 'radial-gradient(130% 110% at 20% 45%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.15) 100%), linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.3) 32%, transparent 65%)',
         }}
       />
