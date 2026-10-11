@@ -63,16 +63,24 @@
 
   .btn {
     display: grid; place-items: center;
-    background: var(--glass); border: 1px solid var(--edge);
+    /* layered cap: top light + body + base — reads as a physical key */
+    background:
+      radial-gradient(120% 90% at 30% 22%, rgba(255,255,255,0.22), rgba(255,255,255,0.04) 46%),
+      linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.22)),
+      var(--glass);
+    border: 1px solid var(--edge);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -6px 12px -6px rgba(0,0,0,0.55), 0 6px 16px -6px rgba(0,0,0,0.6);
     color: #fff; border-radius: 50%;
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
     font-weight: 700; touch-action: none;
-    transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease;
+    transition: transform 0.07s ease, background 0.07s ease, box-shadow 0.07s ease;
   }
   .btn.press {
-    transform: scale(0.92);
-    background: rgba(168, 85, 247, 0.35);
-    box-shadow: 0 0 26px -4px var(--acc);
+    transform: scale(0.9);
+    background:
+      radial-gradient(120% 90% at 30% 22%, rgba(255,255,255,0.14), rgba(168,85,247,0.3) 55%),
+      var(--glass);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.55), 0 0 30px -4px var(--acc);
   }
   .dpad { position: relative; width: calc(168px * var(--scale)); height: calc(168px * var(--scale)); }
   .dpad .btn { position: absolute; width: calc(58px * var(--scale)); height: calc(58px * var(--scale)); font-size: calc(19px * var(--scale)); }
@@ -98,20 +106,22 @@
   .main { display: flex; align-items: center; justify-content: space-between; }
   .center { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 
-  /* analog sticks */
+  /* analog sticks — concave well + convex dome nub */
   .stick {
     position: relative; width: calc(128px * var(--scale)); height: calc(128px * var(--scale));
-    border-radius: 50%; background: var(--glass); border: 1px solid var(--edge);
+    border-radius: 50%; border: 1px solid var(--edge);
+    background: radial-gradient(circle at 50% 42%, rgba(0,0,0,0.42), rgba(255,255,255,0.05) 68%), var(--glass);
+    box-shadow: inset 0 10px 26px -8px rgba(0,0,0,0.75), inset 0 -2px 0 rgba(255,255,255,0.06), 0 8px 26px -10px rgba(0,0,0,0.7);
     display: grid; place-items: center; touch-action: none;
   }
   .stick .nub {
     position: absolute; width: 42%; height: 42%; border-radius: 50%;
-    background: linear-gradient(135deg, rgba(168,85,247,0.55), rgba(124,58,237,0.45));
-    border: 1px solid rgba(255,255,255,0.25);
-    box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+    background: radial-gradient(120% 100% at 32% 24%, rgba(255,255,255,0.35), rgba(168,85,247,0.55) 45%, rgba(124,58,237,0.5) 80%);
+    border: 1px solid rgba(255,255,255,0.3);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 2px 4px rgba(255,255,255,0.35), inset 0 -5px 10px -4px rgba(0,0,0,0.5);
     left: 29%; top: 29%; will-change: transform;
   }
-  .stick.l3 { border-color: rgba(168,85,247,0.6); box-shadow: 0 0 22px -6px var(--acc); }
+  .stick.l3 { border-color: rgba(168,85,247,0.6); box-shadow: inset 0 10px 26px -8px rgba(0,0,0,0.75), 0 0 26px -6px var(--acc); }
   .stick .label { position: absolute; bottom: 6%; font-size: 9px; letter-spacing: 0.15em; color: rgba(255,255,255,0.35); font-weight: 700; }
   .strow { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
 

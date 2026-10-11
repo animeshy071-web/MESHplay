@@ -57,7 +57,7 @@ const KEY = 'meshplay.settings.v1'
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'violet',
   defaultView: 'row',
-  fps: true,
+  fps: false,
   bootAnimation: true,
   reduceMotion: false,
   quality: 'balanced',

@@ -546,8 +546,8 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
           ))}
         </div>
 
-        {/* Rows */}
-        <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-y-auto no-scrollbar">
+        {/* Rows — re-animates on section change (no more hard swaps) */}
+        <div key={section} className="stagger flex min-w-0 flex-1 flex-col gap-2 overflow-y-auto no-scrollbar scroll-smooth">
           {rows.map((r, i) => (
             <div
               key={r.label}
@@ -577,10 +577,26 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
                     value={r.slider.get()}
                     onChange={(e) => r.slider!.set(parseFloat(e.target.value))}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-32 accent-[var(--acc)]"
+                    style={{ ['--fill' as string]: `${((r.slider.get() - r.slider.min) / (r.slider.max - r.slider.min)) * 100}%` }}
+                    className="w-36"
                   />
                 )}
-                <span className="text-sm font-semibold text-[var(--acc)]">{r.value()}</span>
+                {/* real switch for on/off rows — text value for everything else */}
+                {(() => {
+                  const v = r.value()
+                  if (v === 'On' || v === 'Off') {
+                    return (
+                      <span
+                        className="switch"
+                        data-on={v === 'On'}
+                        role="switch"
+                        aria-checked={v === 'On'}
+                        aria-label={r.label}
+                      />
+                    )
+                  }
+                  return <span className="text-sm font-semibold text-[var(--acc)]">{v}</span>
+                })()}
               </div>
             </div>
           ))}

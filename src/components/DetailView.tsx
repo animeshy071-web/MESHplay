@@ -141,7 +141,7 @@ export default function DetailView({ game, onPlay, onBack }: Props) {
           ra ? (
             <div className="rounded-2xl bg-white/5 px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-widest text-white/45">🏆 RetroAchievements</span>
+                <span className="t-micro">RetroAchievements</span>
                 <span className="text-xs font-bold text-[var(--acc)]">{ra.earned}/{ra.total} · {ra.points} pts</span>
               </div>
               <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
@@ -165,7 +165,7 @@ export default function DetailView({ game, onPlay, onBack }: Props) {
             <div className="rounded-2xl bg-white/5 px-4 py-3 text-xs text-white/35">This ROM isn't in the RetroAchievements database yet.</div>
           ) : !getRaCredentials() ? (
             <div className="rounded-2xl bg-white/5 px-4 py-3">
-              <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-white/45">🏆 RetroAchievements</div>
+              <div className="t-micro mb-2">RetroAchievements</div>
               <div className="mb-3 text-xs text-white/45">Link your account to track achievements for this ROM.</div>
               <div className="flex gap-2">
                 <input className="input flex-1" placeholder="Username" value={raUser} onChange={(e) => setRaUser(e.target.value)} spellCheck={false} />

@@ -40,6 +40,178 @@ button { outline: none; }
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+/* ==================== PREMIUM SYSTEM (v2) ==================== */
+
+/* --- N4: the material recipe — every box obeys --- */
+.glass {
+  background: rgba(19, 13, 32, 0.92);
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 24px 60px -24px rgba(0, 0, 0, 0.75);
+}
+.glass-pill {
+  background: rgba(19, 13, 32, 0.88);
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+}
+/* soft glass — for elements sitting over art, lighter touch */
+.glass-soft {
+  background: rgba(24, 17, 40, 0.72);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 48px -22px rgba(0, 0, 0, 0.7);
+}
+
+/* --- N6/G1/G3: hover + focus + reveal --- */
+/* hover language: lift + hairline + reveal glow, 120ms */
+.reveal-card { position: relative; overflow: hidden; }
+.reveal-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+  background: radial-gradient(220px circle at var(--rx, 50%) var(--ry, 50%), rgba(255, 255, 255, 0.09), transparent 65%);
+  z-index: 1;
+}
+.reveal-card:hover::before { opacity: 1; }
+.hover-lift {
+  transition: transform 0.12s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.12s, box-shadow 0.12s, opacity 0.18s;
+}
+.hover-lift:hover { transform: translateY(-2px); }
+
+/* focus language: scale + white hairline + tinted bloom (color injected inline) */
+.focus-ring { transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
+.focus-ring[data-focused='true'] {
+  transform: scale(1.05);
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.65),
+    0 0 24px -4px var(--glow, var(--acc)),
+    0 0 64px -12px var(--glow, var(--acc)),
+    0 16px 44px -12px rgba(0, 0, 0, 0.8);
+  z-index: 20;
+}
+.dim-neighbors > * { transition: opacity 0.18s; }
+.dim-neighbors:hover > *, .dim-neighbors[data-dim='true'] > * { opacity: 0.72; }
+.dim-neighbors:hover > :hover { opacity: 1; }
+.dim-neighbors > [data-focused='true'] { opacity: 1 !important; }
+
+/* --- buttons: one language everywhere --- */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  border-radius: 9999px;
+  background: #fff; color: #0b0714;
+  font-weight: 800; font-size: 14px; letter-spacing: 0.01em;
+  padding: 12px 30px;
+  box-shadow: 0 8px 30px -10px rgba(255, 255, 255, 0.35), inset 0 1px 0 rgba(255,255,255,0.9);
+  transition: transform 0.12s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 38px -10px rgba(255,255,255,0.5), inset 0 1px 0 rgba(255,255,255,0.9); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: transform 0.12s, background 0.15s, border-color 0.15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.25); transform: translateY(-1px); }
+.btn-ghost:active { transform: scale(0.97); }
+
+/* --- real switch (settings toggles) --- */
+.switch {
+  position: relative; width: 44px; height: 24px; border-radius: 9999px;
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.12);
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s; flex-shrink: 0;
+}
+.switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 9999px; background: rgba(255,255,255,0.75);
+  transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), background 0.2s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.switch[data-on='true'] { background: var(--acc); border-color: var(--acc); box-shadow: 0 0 18px -4px var(--acc); }
+.switch[data-on='true']::after { transform: translateX(20px); background: #fff; }
+
+/* --- premium range sliders --- */
+input[type='range'] {
+  -webkit-appearance: none; appearance: none;
+  height: 6px; border-radius: 9999px; outline: none;
+  background: linear-gradient(to right, var(--acc) var(--fill, 50%), rgba(255,255,255,0.14) var(--fill, 50%));
+  box-shadow: 0 0 14px -6px var(--acc);
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 9999px;
+  background: #fff; border: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 35%, transparent), 0 3px 10px rgba(0,0,0,0.5);
+  transition: transform 0.12s;
+}
+input[type='range']::-webkit-slider-thumb:hover { transform: scale(1.15); }
+input[type='range']:active::-webkit-slider-thumb { transform: scale(1.25); }
+
+/* --- styled native select (the one in AddGameModal) --- */
+select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ffffff90' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 34px;
+}
+
+/* --- G5: type roles --- */
+.font-display { font-family: 'Space Grotesk Variable', 'Outfit Variable', 'Outfit', system-ui, sans-serif; }
+.t-display { font-family: 'Space Grotesk Variable', 'Outfit Variable', sans-serif; font-weight: 500; letter-spacing: -0.02em; }
+.t-micro {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.22em; color: rgba(255,255,255,0.45);
+}
+
+/* --- modal cascade --- */
+@keyframes fade-up-stagger {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stagger > * { animation: fade-up-stagger 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+.stagger > :nth-child(2) { animation-delay: 0.05s; }
+.stagger > :nth-child(3) { animation-delay: 0.1s; }
+.stagger > :nth-child(4) { animation-delay: 0.15s; }
+.stagger > :nth-child(5) { animation-delay: 0.2s; }
+.stagger > :nth-child(6) { animation-delay: 0.25s; }
+.stagger > :nth-child(7) { animation-delay: 0.3s; }
+.stagger > :nth-child(8) { animation-delay: 0.35s; }
+
+/* --- N7: boot ritual keyframes --- */
+@keyframes boot-particle {
+  0% { transform: scale(0); opacity: 0; }
+  40% { opacity: 0.8; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes boot-draw {
+  from { stroke-dashoffset: 252; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes boot-pop {
+  0% { transform: scale(0.6); opacity: 0; filter: blur(8px); }
+  60% { transform: scale(1.06); filter: blur(0); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes boot-pulse {
+  0% { opacity: 0; transform: scale(0.8); }
+  55% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+
+/* ==================== /PREMIUM SYSTEM ==================== */
+
 .glow-cyan {
   box-shadow: 0 0 25px rgba(34, 211, 238, 0.75), inset 0 0 12px rgba(34, 211, 238, 0.35);
 }

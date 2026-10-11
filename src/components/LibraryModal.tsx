@@ -185,14 +185,16 @@ export default function LibraryModal({ isOpen, onClose, onSelectGame }: Props) {
           </div>
         )}
 
-        {/* game list */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-2">
+        {/* game list — cascade in */}
+        <div className="stagger flex-1 overflow-y-auto no-scrollbar px-2">
           {games.map((g, i) => (
             <div
               key={g.id}
-              className={`group mb-2 flex cursor-pointer items-center gap-4 rounded-2xl px-4 py-3 transition-all duration-200 ${
-                sel === i ? 'bg-white/12 ring-1 ring-[var(--acc)]' : 'bg-white/4 hover:bg-white/8'
-              }`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${g.title}`}
+              className="reveal-card group mb-2 flex cursor-pointer items-center gap-4 rounded-2xl px-4 py-3 transition-all duration-200 hover-lift"
+              style={sel === i ? { background: 'rgba(255,255,255,0.12)', boxShadow: 'inset 0 0 0 1px var(--acc)' } : { background: 'rgba(255,255,255,0.04)' }}
               onMouseEnter={() => setSel(i)}
               onClick={() => {
                 sfx.select()

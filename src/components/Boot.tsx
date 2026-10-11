@@ -1,4 +1,11 @@
+// Boot ritual — three stages, frame-synced with the ignition swell:
+//   ① particle ignition from black  ② logo assembles (ring draws, tile pops)
+//   ③ wordmark letters stagger + theme pulse → dissolve into the wallpaper.
+// Skippable with any key; never replays within a session (App gates it).
+
 import { useEffect, useState } from 'react'
+
+const WORD = ['M', 'E', 'S', 'H']
 
 export default function Boot({ onDone, skip = false }: { onDone: () => void; skip?: boolean }) {
   const [leaving, setLeaving] = useState(false)
@@ -8,8 +15,9 @@ export default function Boot({ onDone, skip = false }: { onDone: () => void; ski
       onDone()
       return
     }
-    const t1 = setTimeout(() => setLeaving(true), 2200)
-    const t2 = setTimeout(onDone, 2650)
+    void import('../system/mixer').then(({ sfx }) => sfx.boot())
+    const t1 = setTimeout(() => setLeaving(true), 2500)
+    const t2 = setTimeout(onDone, 3000)
     const skipFn = () => onDone()
     window.addEventListener('keydown', skipFn, { once: true })
     return () => {
@@ -23,26 +31,83 @@ export default function Boot({ onDone, skip = false }: { onDone: () => void; ski
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black transition-opacity duration-500"
-      style={{ opacity: leaving ? 0 : 1 }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black transition-all duration-500"
+      style={{ opacity: leaving ? 0 : 1, transform: leaving ? 'scale(1.035)' : 'scale(1)' }}
     >
-      <div className="relative flex items-center gap-5" style={{ animation: 'fade-up 0.7s cubic-bezier(0.22,1,0.36,1) both' }}>
+      {/* ① particle ignition — soft embers bloom out from center */}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="pointer-events-none absolute rounded-full"
+          style={{
+            width: '46vmin',
+            height: '46vmin',
+            background: 'radial-gradient(circle, var(--acc) 0%, transparent 62%)',
+            opacity: 0.16,
+            animation: `boot-particle 1.15s cubic-bezier(0.16, 1, 0.3, 1) ${0.12 + i * 0.22}s both`,
+          }}
+        />
+      ))}
+
+      {/* ② logo assembles */}
+      <div className="relative flex items-center gap-5">
         <div className="relative flex h-16 w-16 items-center justify-center">
           <svg viewBox="0 0 80 80" className="absolute inset-0 h-full w-full">
-            <circle cx="40" cy="40" r="36" fill="none" stroke="var(--acc)" strokeWidth="2.5"
-              strokeLinecap="round" strokeDasharray="440" style={{ animation: 'sweep 1.4s cubic-bezier(0.22,1,0.36,1) both' }} />
+            <circle
+              cx="40" cy="40" r="36" fill="none"
+              stroke="var(--acc)" strokeWidth="2.5"
+              strokeLinecap="round" strokeDasharray="252"
+              transform="rotate(-90 40 40)"
+              style={{ animation: 'boot-draw 1.1s cubic-bezier(0.22,1,0.36,1) 0.25s both' }}
+            />
           </svg>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--acc)] to-[var(--acc2)] text-2xl font-black shadow-[0_0_40px_-4px_var(--acc)]">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--acc)] to-[var(--acc2)] text-2xl font-black shadow-[0_0_46px_-4px_var(--acc)]"
+            style={{ animation: 'boot-pop 0.7s cubic-bezier(0.22,1,0.36,1) 0.55s both' }}
+          >
             M
           </div>
         </div>
-        <span className="text-5xl font-black tracking-tight">
-          MESH<span className="text-[var(--acc)]">play</span>
+
+        {/* ③ wordmark letters stagger into place */}
+        <span className="font-display text-5xl tracking-tight" style={{ fontWeight: 500 }}>
+          {WORD.map((ch, i) => (
+            <span
+              key={i}
+              className="inline-block text-white"
+              style={{ animation: `letter-up 0.5s cubic-bezier(0.22,1,0.36,1) ${0.85 + i * 0.055}s both` }}
+            >
+              {ch}
+            </span>
+          ))}
+          {['p', 'l', 'a', 'y'].map((ch, i) => (
+            <span
+              key={`p${i}`}
+              className="inline-block text-[var(--acc)]"
+              style={{ animation: `letter-up 0.5s cubic-bezier(0.22,1,0.36,1) ${1.1 + i * 0.055}s both` }}
+            >
+              {ch}
+            </span>
+          ))}
         </span>
       </div>
-      <div className="mt-7 text-[11px] font-semibold uppercase tracking-[0.55em] text-white/35" style={{ animation: 'fade-in 0.8s ease 0.7s both' }}>
-        A Gaming OS
+
+      <div
+        className="t-micro mt-8"
+        style={{ animation: 'fade-in 0.9s ease 1.5s both', letterSpacing: '0.55em' }}
+      >
+        A GAMING OS
       </div>
+
+      {/* theme pulse right before handoff — home feels continuous, not cut to */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: 'radial-gradient(42% 42% at 50% 50%, var(--acc) 0%, transparent 70%)',
+          opacity: 0,
+          animation: 'boot-pulse 0.9s ease-out 2.1s both',
+        }}
+      />
     </div>
   )
 }

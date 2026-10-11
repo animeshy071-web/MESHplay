@@ -132,6 +132,32 @@ export default function OrbitalCrescent({
             stroke="rgba(255, 255, 255, 0.1)"
             strokeWidth="1"
           />
+
+          {/* G2: the crescent itself — a glowing theme-colored arc the badges ride */}
+          <defs>
+            <linearGradient id="crescentGlow" x1="0" y1="-1" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--game-acc, #a855f7)" stopOpacity="0" />
+              <stop offset="50%" stopColor="var(--game-acc, #a855f7)" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="var(--game-acc, #a855f7)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* soft bloom under-stroke */}
+          <path
+            d="M 159.6 -300.2 A 340 340 0 0 1 159.6 300.2"
+            fill="none"
+            stroke="url(#crescentGlow)"
+            strokeWidth="9"
+            strokeLinecap="round"
+            opacity="0.28"
+          />
+          {/* crisp arc */}
+          <path
+            d="M 159.6 -300.2 A 340 340 0 0 1 159.6 300.2"
+            fill="none"
+            stroke="url(#crescentGlow)"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
 
         {/* Profile / Hero Icon on Far Left */}
@@ -220,6 +246,9 @@ export default function OrbitalCrescent({
           return (
             <div
               key={game.id}
+              role="button"
+              tabIndex={0}
+              aria-label={game.title}
               onClick={() => {
                 if (isMiddle) {
                   sfx.launch()

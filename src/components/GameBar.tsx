@@ -19,15 +19,17 @@ interface Props {
   onClose: () => void
 }
 
+import Icon, { type IconName } from './Icon'
+
 type Tab = 'perf' | 'audio' | 'states' | 'rewind' | 'filters' | 'capture'
 
-const TABS: Array<{ id: Tab; label: string; icon: string }> = [
-  { id: 'perf', label: 'Performance', icon: '📊' },
-  { id: 'audio', label: 'Mixer', icon: '🎚️' },
-  { id: 'states', label: 'States', icon: '💾' },
-  { id: 'rewind', label: 'Rewind', icon: '⏪' },
-  { id: 'filters', label: 'Filters', icon: '📺' },
-  { id: 'capture', label: 'Capture', icon: '📸' },
+const TABS: Array<{ id: Tab; label: string; icon: IconName }> = [
+  { id: 'perf', label: 'Performance', icon: 'perf' },
+  { id: 'audio', label: 'Mixer', icon: 'mixer' },
+  { id: 'states', label: 'States', icon: 'states' },
+  { id: 'rewind', label: 'Rewind', icon: 'rewind' },
+  { id: 'filters', label: 'Filters', icon: 'filters' },
+  { id: 'capture', label: 'Capture', icon: 'capture' },
 ]
 
 export default function GameBar({ game, api, filterMode, onFilterChange, onClose }: Props) {
@@ -55,7 +57,7 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
     window.setTimeout(() => setToast(null), 1800)
   }
 
-  // drag anywhere on the bar
+  // drag anywhere on the bar — edge-snapping + remembered position
   const onPointerDown = (e: React.PointerEvent) => {
     dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y }
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -66,41 +68,65 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
   }
   const onPointerUp = () => {
     dragRef.current = null
+    setPos((p) => {
+      // N2: snap to edges + vertical guide lines so placement always feels deliberate
+      const snapX = Math.abs(p.x) < 48 ? 0 : p.x
+      const snapped = { ...p, x: snapX }
+      try {
+        localStorage.setItem('meshplay.gamebar.pos', JSON.stringify(snapped))
+      } catch { /* private mode */ }
+      return snapped
+    })
   }
+
+  // restore last position
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('meshplay.gamebar.pos')
+      if (saved) setPos(JSON.parse(saved) as { x: number; y: number })
+    } catch { /* ignore */ }
+  }, [])
 
   const captureShot = async () => {
     const p = await api.screenshot()
-    flash(p ? '📸 Screenshot saved' : 'Screenshot failed')
+    flash(p ? 'Screenshot saved' : 'Screenshot failed')
     sfx.chime()
   }
   const saveReplay = async () => {
     const p = await api.saveReplay()
-    flash(p ? '🎬 30s replay saved' : 'Replay not ready yet')
+    flash(p ? '30s replay saved' : 'Replay not ready yet')
   }
 
   const stateThumb = async (slot: string) => {
     const thumb = await api.saveState(slot)
     if (thumb) {
-      flash(`💾 Saved slot ${slot.toUpperCase()}`)
+      flash(`Saved slot ${slot.toUpperCase()}`)
       void api.listStates().then(setStates)
     }
   }
   const loadThumb = async (slot: string) => {
     const ok = await api.loadState(slot)
     if (ok) {
-      flash(`⟲ Loaded slot ${slot.toUpperCase()}`)
+      flash(`Loaded slot ${slot.toUpperCase()}`)
       onClose()
     }
   }
 
   return (
     <div
-      className="absolute z-[70] w-[520px] max-w-[92vw] select-none anim-fade-up"
-      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, left: '50%', top: '14vh', marginLeft: '-260px' }}
+      className="absolute z-[70] w-[560px] max-w-[94vw] select-none anim-fade-up"
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, left: '50%', top: '12vh', marginLeft: '-280px' }}
     >
       <div
-        className="glass cursor-move rounded-[26px] p-4"
-        style={{ boxShadow: '0 30px 90px -20px rgba(0,0,0,0.85), 0 0 60px -20px var(--acc)' }}
+        className="cursor-move rounded-[26px] border border-white/10"
+        style={{
+          // N2: opaque layered material — readable over any game, never see-through
+          background: 'rgba(16, 11, 26, 0.96)',
+          backdropFilter: 'blur(24px) saturate(1.2)',
+          WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.08), 0 30px 90px -20px rgba(0,0,0,0.9), 0 0 70px -24px var(--game-acc, var(--acc))',
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -116,7 +142,7 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
             className="rounded-full px-3 py-1 text-[11px] font-bold text-white/60 transition hover:bg-white/10 hover:text-white"
             onClick={() => { sfx.back(); onClose() }}
           >
-            ✕ Close
+            <Icon name="close" className="mr-1 h-3.5 w-3.5" /> Close
           </button>
         </div>
 
@@ -130,7 +156,7 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
               }`}
               onClick={() => { sfx.travel(); setTab(t.id) }}
             >
-              <span className="mr-1">{t.icon}</span>
+              <Icon name={t.icon} className="mr-1 h-4 w-4" />
               {t.label}
             </button>
           ))}
@@ -162,7 +188,7 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
                     className="flex-1 rounded-2xl bg-white/8 px-3 py-2.5 text-xs font-bold text-white/80 transition hover:bg-white/15"
                     onClick={() => void stateThumb(slot)}
                   >
-                    💾 Save {slot.toUpperCase()}
+                <Icon name="save" className="mr-1.5 h-3.5 w-3.5" /> Save {slot.toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -206,7 +232,7 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
                   const v = parseFloat((e.target as HTMLInputElement).value)
                   if (v > 0.2) {
                     api.rewind(v)
-                    flash(`⏪ Rewound ${v.toFixed(1)}s`)
+      flash(`Rewound ${v.toFixed(1)}s`)
                   }
                 }}
               />
@@ -234,13 +260,13 @@ export default function GameBar({ game, api, filterMode, onFilterChange, onClose
                 className="rounded-3xl bg-white/8 px-4 py-6 text-sm font-bold text-white/85 transition hover:bg-white/15"
                 onClick={() => void captureShot()}
               >
-                📸 Screenshot
+                <Icon name="screenshot" className="mr-1.5 h-3.5 w-3.5" /> Screenshot
               </button>
               <button
                 className="rounded-3xl bg-white/8 px-4 py-6 text-sm font-bold text-white/85 transition hover:bg-white/15"
                 onClick={() => void saveReplay()}
               >
-                🎬 Save 30s Replay
+                <Icon name="replay" className="mr-1.5 h-3.5 w-3.5" /> Save 30s Replay
               </button>
             </div>
           )}
