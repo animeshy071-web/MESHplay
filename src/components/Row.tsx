@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Game } from '../system/library'
 import TileArt from './TileArt'
 import { sfx } from '../lib/sound'
@@ -143,9 +143,17 @@ export default function Row({
                 <div
                   className={`relative h-[138px] w-[138px] overflow-hidden rounded-[22px] transition-all duration-300 ${
                     isFocused
-                      ? 'ring-3 ring-emerald-400 shadow-[0_0_32px_rgba(52,211,153,0.85),0_12px_40px_rgba(0,0,0,0.85)]'
+                      ? 'ring-2 ring-white/60'
                       : 'border border-white/12 shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
                   }`}
+                  style={
+                    isFocused
+                      ? {
+                          // soft ambient glow tinted by the game's own art color — blends, never boxes
+                          boxShadow: `0 0 0 2px rgba(255,255,255,0.55), 0 0 28px -4px ${g.colors[0]}B3, 0 0 80px -12px ${g.colors[0]}80, 0 14px 44px rgba(0,0,0,0.8)`,
+                        }
+                      : undefined
+                  }
                 >
                   <TileArt
                     colors={g.colors}
@@ -192,20 +200,20 @@ export default function Row({
             }}
             className={`group relative h-[116px] cursor-pointer overflow-hidden rounded-2xl transition-all duration-300 ${
               focusRow === 'banners' && bannerIdx === 0
-                ? 'scale-104 -translate-y-1.5 ring-3 ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.8)] z-10'
+                ? 'scale-104 -translate-y-1.5 ring-2 ring-white/60 z-10'
                 : 'border border-white/10 hover:border-white/30 bg-[#0d161a]/85'
             }`}
           >
             {/* Collage Artwork background */}
             <div className="absolute inset-0 flex opacity-75">
-              <div className="w-1/4 bg-gradient-to-b from-emerald-800 to-green-950 flex items-center justify-center text-xs">ðŸ‘¾</div>
-              <div className="w-1/4 bg-gradient-to-b from-blue-800 to-indigo-950 flex items-center justify-center text-xs">ðŸ§±</div>
-              <div className="w-1/4 bg-gradient-to-b from-purple-800 to-fuchsia-950 flex items-center justify-center text-xs">ðŸš€</div>
-              <div className="w-1/4 bg-gradient-to-b from-amber-800 to-orange-950 flex items-center justify-center text-xs">ðŸŽï¸</div>
+              <div className="w-1/4 bg-gradient-to-b from-emerald-800 to-green-950 flex items-center justify-center text-xs">👾</div>
+              <div className="w-1/4 bg-gradient-to-b from-blue-800 to-indigo-950 flex items-center justify-center text-xs">🧱</div>
+              <div className="w-1/4 bg-gradient-to-b from-purple-800 to-fuchsia-950 flex items-center justify-center text-xs">🚀</div>
+              <div className="w-1/4 bg-gradient-to-b from-amber-800 to-orange-950 flex items-center justify-center text-xs">🏎️</div>
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
             <div className="absolute bottom-3 left-4 flex items-center gap-2">
-              <span className="text-lg">ðŸŽ®</span>
+              <span className="text-lg">🏎️®</span>
               <span className="text-xs font-bold text-white tracking-wide">Browse your games</span>
             </div>
           </div>
@@ -220,13 +228,13 @@ export default function Row({
             }}
             className={`group relative h-[116px] cursor-pointer overflow-hidden rounded-2xl transition-all duration-300 ${
               focusRow === 'banners' && bannerIdx === 1
-                ? 'scale-104 -translate-y-1.5 ring-3 ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.8)] z-10'
+                ? 'scale-104 -translate-y-1.5 ring-2 ring-white/60 z-10'
                 : 'border border-white/10 hover:border-white/30 bg-[#0c1820]/85'
             }`}
           >
             <div className="absolute inset-0 bg-gradient-to-tr from-[#0a1822] to-[#122c3b] flex items-center justify-center">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 border border-white/15 text-2xl">
-                ðŸŽ¨
+                🏎️¨
               </div>
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
@@ -245,7 +253,7 @@ export default function Row({
             }}
             className={`group relative h-[116px] cursor-pointer overflow-hidden rounded-2xl transition-all duration-300 ${
               focusRow === 'banners' && bannerIdx === 2
-                ? 'scale-104 -translate-y-1.5 ring-3 ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.8)] z-10'
+                ? 'scale-104 -translate-y-1.5 ring-2 ring-white/60 z-10'
                 : 'border border-white/10 hover:border-white/30 bg-[#141822]/85'
             }`}
           >
@@ -253,15 +261,15 @@ export default function Row({
               className="absolute inset-0"
               style={{ background: `linear-gradient(135deg, ${focusedGame.colors[0]}, ${focusedGame.colors[1]})` }}
             />
-            <div className="absolute top-2.5 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-400 border border-white/15">
-              <span>RETRO PASS</span>
+            <div className="absolute top-2.5 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-[var(--lite)] border border-white/15">
+              <span>FEATURED</span>
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
             <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
               <span className="truncate text-xs font-extrabold text-white tracking-wide">
-                {focusedGame.title} Â· Play
+                {focusedGame.title} · Play
               </span>
-              <span className="text-xs text-emerald-400 font-black">â–¶</span>
+              <span className="text-xs text-[var(--lite)] font-black">▶</span>
             </div>
           </div>
 
@@ -275,13 +283,13 @@ export default function Row({
             }}
             className={`group relative h-[116px] cursor-pointer overflow-hidden rounded-2xl transition-all duration-300 ${
               focusRow === 'banners' && bannerIdx === 3
-                ? 'scale-104 -translate-y-1.5 ring-3 ring-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.8)] z-10'
+                ? 'scale-104 -translate-y-1.5 ring-2 ring-white/60 z-10'
                 : 'border border-white/10 hover:border-white/30 bg-black/85'
             }`}
           >
             <div className="absolute inset-0 bg-[#050508] flex items-center justify-end pr-4">
               <div className="text-3xl opacity-50 transition-transform duration-300 group-hover:scale-110">
-                ðŸ•¹ï¸
+                🕹️
               </div>
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent" />

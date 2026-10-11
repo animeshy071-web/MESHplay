@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from 'react'
+import { useState, useRef } from 'react'
 import type { Game } from '../system/library'
 import TileArt from './TileArt'
 import { sfx } from '../lib/sound'
@@ -182,108 +182,16 @@ export default function OrbitalCrescent({
             {/* Hover option badge */}
             <div className="pointer-events-none absolute left-[85%] top-1/2 -translate-y-1/2 z-40 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
               <div className="glass-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-white shadow-lg whitespace-nowrap border border-white/20">
-                <span>{isRotating ? 'â¸' : 'â–¶'}</span>
+                <span>{isRotating ? '⏸' : '▶'}</span>
                 <span>{isRotating ? 'Click to Pause' : 'Click to Rotate'}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            CRESCENT ARC ARROW CHEVRONS: Ultra-sleek Glass Controls
-            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-
-        {/* Up Arrow Button (Flanking Above Middle Selector) */}
-        <button
-          type="button"
-          onClick={handlePrev}
-          title="Previous Game (Arrow Up / Left)"
-          aria-label="Previous Game"
-          style={{ left: 330, top: -72 }}
-          className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white/60 hover:text-white hover:border-white hover:bg-white/25 hover:scale-120 hover:shadow-[0_0_20px_rgba(255,255,255,0.85)] active:scale-90 transition-all duration-200 cursor-pointer z-40 group"
-        >
-          <svg
-            className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-y-0.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="18 15 12 9 6 15" />
-          </svg>
-        </button>
-
-        {/* Down Arrow Button (Flanking Below Middle Selector) */}
-        <button
-          type="button"
-          onClick={handleNext}
-          title="Next Game (Arrow Down / Right)"
-          aria-label="Next Game"
-          style={{ left: 330, top: 72 }}
-          className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white/60 hover:text-white hover:border-white hover:bg-white/25 hover:scale-120 hover:shadow-[0_0_20px_rgba(255,255,255,0.85)] active:scale-90 transition-all duration-200 cursor-pointer z-40 group"
-        >
-          <svg
-            className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-y-0.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
-
-        {/* Upper Arc Tip Arrow Button */}
-        <button
-          type="button"
-          onClick={handlePrev}
-          title="Scroll Up (Arrow Up)"
-          aria-label="Scroll Up"
-          style={{ left: 92, top: -326 }}
-          className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-white/40 hover:text-white hover:border-white/70 hover:bg-white/20 hover:scale-120 hover:shadow-[0_0_16px_rgba(255,255,255,0.75)] active:scale-90 transition-all duration-200 cursor-pointer z-30 group"
-        >
-          <svg
-            className="w-3 h-3 transition-transform duration-200 group-hover:-translate-y-0.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="18 15 12 9 6 15" />
-          </svg>
-        </button>
-
-        {/* Lower Arc Tip Arrow Button */}
-        <button
-          type="button"
-          onClick={handleNext}
-          title="Scroll Down (Arrow Down)"
-          aria-label="Scroll Down"
-          style={{ left: 92, top: 326 }}
-          className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-white/40 hover:text-white hover:border-white/70 hover:bg-white/20 hover:scale-120 hover:shadow-[0_0_16px_rgba(255,255,255,0.75)] active:scale-90 transition-all duration-200 cursor-pointer z-30 group"
-        >
-          <svg
-            className="w-3 h-3 transition-transform duration-200 group-hover:translate-y-0.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
-
-        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        {/* ─────────────────────────────────────────────────────────────
             CRESCENT ARC GAMES: Side Icons Faded & Small, Middle Big & White
-            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            (navigation: mouse wheel, arrow keys, or click a badge) */}
         {visibleSlots.map(({ k, game, gameIndex }) => {
           if (!game) return null
           const isMiddle = k === 0
@@ -335,13 +243,21 @@ export default function OrbitalCrescent({
               <div
                 className={`relative flex items-center justify-center rounded-full transition-all duration-350 ease-out ${
                   isMiddle
-                    ? 'h-20 w-20 ring-2 ring-white/70 shadow-[0_0_28px_rgba(255,255,255,0.4)] group-hover/mid:scale-135 group-hover/mid:ring-4 group-hover/mid:ring-white group-hover/mid:shadow-[0_0_75px_rgba(255,255,255,1),0_0_35px_rgba(255,255,255,0.95),inset_0_0_18px_rgba(255,255,255,0.7)]'
+                    ? 'h-20 w-20 ring-2 ring-white/50 group-hover/mid:scale-110'
                     : ak === 1
-                      ? 'h-9 w-9 opacity-35 grayscale-[35%] brightness-90 hover:opacity-85 hover:scale-115 hover:grayscale-0 hover:brightness-100 ring-1 ring-white/15'
+                      ? 'h-9 w-9 opacity-50 brightness-95 hover:opacity-95 hover:scale-115 hover:brightness-100 ring-1 ring-white/15'
                       : ak === 2
-                        ? 'h-7.5 w-7.5 opacity-20 grayscale-[55%] brightness-75 hover:opacity-70 hover:scale-110 hover:grayscale-0 hover:brightness-100 ring-1 ring-white/10'
-                        : 'h-6 w-6 opacity-12 grayscale-[70%] brightness-60 hover:opacity-50 hover:scale-105 ring-1 ring-white/5'
+                        ? 'h-7.5 w-7.5 opacity-35 brightness-85 hover:opacity-80 hover:scale-110 ring-1 ring-white/10'
+                        : 'h-6 w-6 opacity-20 brightness-75 hover:opacity-60 hover:scale-105 ring-1 ring-white/5'
                 }`}
+                style={
+                  isMiddle
+                    ? {
+                        // white core hairline + theme-tinted ambient bloom — blends with the badge
+                        boxShadow: `0 0 0 1.5px rgba(255,255,255,0.45), 0 0 26px -2px ${game.colors[0]}B3, 0 0 70px -14px ${game.colors[0]}80`,
+                      }
+                    : undefined
+                }
               >
                 <TileArt
                   colors={game.colors}
@@ -360,12 +276,12 @@ export default function OrbitalCrescent({
                 )}
               </div>
 
-              {/* Middle Main Selection Badge on Hover â€” Open App */}
+              {/* Middle Main Selection Badge on Hover — Open App */}
               {isMiddle && (
                 <div className="pointer-events-none absolute left-full ml-4 opacity-0 group-hover/mid:opacity-100 transition-all duration-300 translate-x-3 group-hover/mid:translate-x-0 whitespace-nowrap z-50">
                   <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white text-black font-black text-xs shadow-[0_0_35px_rgba(255,255,255,0.95)] border border-white">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black text-white text-[10px]">
-                      â–¶
+                      ▶
                     </span>
                     <span className="tracking-wider uppercase">Open {game.title}</span>
                     <span className="text-[10px] font-bold text-black/60 bg-black/10 px-1.5 py-0.5 rounded">

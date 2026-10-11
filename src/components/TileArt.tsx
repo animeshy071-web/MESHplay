@@ -201,7 +201,11 @@ export default function TileArt({ colors, title, id, icon, className = '', isCir
         isCircular ? 'rounded-full aspect-square' : ''
       } ${className}`}
       style={{
-        background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
+        // circles get a center-out radial wash (no diagonal banding at the rim);
+        // squares keep the classic diagonal card gradient
+        background: isCircular
+          ? `radial-gradient(120% 120% at 50% 42%, ${colors[0]} 0%, ${colors[0]} 34%, ${colors[1]} 100%)`
+          : `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
       }}
     >
       {/* Dynamic glossy specular highlights */}
@@ -219,6 +223,16 @@ export default function TileArt({ colors, title, id, icon, className = '', isCir
             'radial-gradient(100% 80% at 80% 100%, rgba(0,0,0,0.45) 0%, transparent 60%)',
         }}
       />
+      {/* circular crops: darken the rim so the badge melts into its ring, no hard edges */}
+      {isCircular && (
+        <div
+          className="pointer-events-none absolute inset-0 rounded-full"
+          style={{
+            background:
+              'radial-gradient(100% 100% at 50% 50%, transparent 58%, rgba(0,0,0,0.18) 82%, rgba(0,0,0,0.42) 100%)',
+          }}
+        />
+      )}
 
       {/* Procedural Game Motif / Emblem */}
       <div className="relative z-10 flex h-full w-full items-center justify-center transition-transform duration-300 hover:scale-105">

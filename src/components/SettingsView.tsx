@@ -539,8 +539,7 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
                 section === i ? 'bg-white/12 text-white ring-2 ring-[var(--acc)]' : 'text-white/45 hover:text-white/75'
               }`}
               style={section === i ? { boxShadow: '0 0 26px -10px var(--acc)' } : undefined}
-              onMouseEnter={() => { if (section !== i) { setSection(i); setRow(0); sfx.travel() } }}
-              onClick={() => { setSection(i); setRow(0) }}
+              onClick={() => { if (section !== i) { setSection(i); setRow(0); sfx.travel() } }}
             >
               {s.name}
             </div>
@@ -553,11 +552,11 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
             <div
               key={r.label}
               className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl px-5 py-3 transition-all duration-300 ${
-                row === i ? 'translate-x-1 bg-white/12 ring-2 ring-[var(--acc)]' : 'bg-white/5'
+                row === i ? 'translate-x-1 bg-white/12 ring-2 ring-[var(--acc)]' : 'bg-white/5 hover:bg-white/8'
               }`}
               style={row === i ? { boxShadow: '0 0 30px -10px var(--acc)' } : undefined}
-              onMouseEnter={() => { if (row !== i) { setRow(i); sfx.travel() } }}
-              onClick={() => r.action()}
+              onMouseEnter={() => { if (row !== i) setRow(i) }}
+              onClick={() => { if (row === i) r.action(); else sfx.travel() }}
             >
               <div className="min-w-0">
                 <div className="text-[14px] font-bold text-white/85">

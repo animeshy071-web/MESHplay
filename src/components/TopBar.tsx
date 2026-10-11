@@ -26,7 +26,6 @@ export default function TopBar({
   onOpenSearch,
 }: Props) {
   const [now, setNow] = useState(new Date())
-  const [notifCount, setNotifCount] = useState(1)
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
@@ -154,12 +153,9 @@ export default function TopBar({
 
       {/* Right Utilities Cluster */}
       <div className="pointer-events-auto absolute right-10 top-5 flex items-center gap-4">
-        {/* Notifications Icon Button */}
+        {/* Notifications Icon Button (badge appears only for real notifications) */}
         <button
-          onClick={() => {
-            sfx.select()
-            setNotifCount(0)
-          }}
+          onClick={() => sfx.select()}
           className="relative flex h-10 w-10 items-center justify-center rounded-full text-white/75 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           title="Notifications"
           aria-label="Notifications"
@@ -168,9 +164,6 @@ export default function TopBar({
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
-          {notifCount > 0 && (
-            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-cyan-400 ring-2 ring-[#050308]" />
-          )}
         </button>
 
         {/* Settings Icon Button */}

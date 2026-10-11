@@ -489,7 +489,7 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
       )}
 
       {/* in-game HUD */}
-      <div className="pointer-events-none absolute right-6 top-5 font-mono text-xs text-white/40">{fps} FPS</div>
+      <div className="pointer-events-none absolute right-8 top-8 z-40 font-mono text-xs text-white/35">{fps} FPS</div>
 
       {/* Floating Game Bar */}
       {gameBarOpen && (
