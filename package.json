@@ -1,7 +1,7 @@
 {
   "name": "meshplay",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "test:gb": "node_modules/.bin/esbuild.cmd scripts/test-gb.ts --bundle --platform=node --format=cjs --outfile=scripts/test-gb.cjs --log-level=error && node scripts/test-gb.cjs"
+    "test:gb": "node_modules/.bin/esbuild.cmd scripts/test-gb.ts --bundle --platform=node --format=cjs --outfile=scripts/test-gb.cjs --log-level=error && node scripts/test-gb.cjs",
+    "cores": "node scripts/fetch-cores.mjs"
   },
   "dependencies": {
     "@fontsource-variable/outfit": "^5.3.0",

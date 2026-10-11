@@ -1,0 +1,124 @@
+{
+  "cores": {
+    "nes": {
+      "core": "nestopia",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/nestopia",
+      "built": 1791709504171
+    },
+    "snes": {
+      "core": "snes9x",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/snes9x",
+      "built": 1791709505196
+    },
+    "genesis": {
+      "core": "genesis_plus_gx",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/genesis_plus_gx",
+      "built": 1791709505545
+    },
+    "sms": {
+      "core": "smsplus",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/smsplus",
+      "built": 1791709505805
+    },
+    "gg": {
+      "core": "genesis_plus_gx",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/genesis_plus_gx",
+      "built": 1791709506082
+    },
+    "segacd": {
+      "core": "genesis_plus_gx",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/genesis_plus_gx",
+      "built": 1791709506384
+    },
+    "sega32x": {
+      "core": "picodrive",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/picodrive",
+      "built": 1791709506637
+    },
+    "gba": {
+      "core": "mgba",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/mgba",
+      "built": 1791709506906
+    },
+    "pce": {
+      "core": "mednafen_pce",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/mednafen_pce",
+      "built": 1791709507281
+    },
+    "neogeo": {
+      "core": "fbneo",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/fbneo",
+      "built": 1791709509439
+    },
+    "arcade": {
+      "core": "fbneo",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/fbneo",
+      "built": 1791709512810
+    },
+    "coleco": {
+      "core": "fbneo",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/fbneo",
+      "built": 1791709515201
+    },
+    "a7800": {
+      "core": "prosystem",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/prosystem",
+      "built": 1791709516212
+    },
+    "lynx": {
+      "core": "handy",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/handy",
+      "built": 1791709516597
+    },
+    "a3do": {
+      "core": "opera",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/opera",
+      "built": 1791709517363
+    },
+    "jaguar": {
+      "core": "virtualjaguar",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/virtualjaguar",
+      "built": 1791709517863
+    },
+    "psx": {
+      "core": "pcsx_rearmed",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/pcsx_rearmed",
+      "built": 1791709518662
+    },
+    "n64": {
+      "core": "mupen64plus_next",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/mupen64plus_next",
+      "built": 1791709519227
+    },
+    "saturn": {
+      "core": "yabause",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/yabause",
+      "built": 1791709519981
+    },
+    "nds": {
+      "core": "melonds",
+      "license": "see license.txt / core repo (GPL/LGPL/BSD/MIT)",
+      "source": "https://github.com/libretro/melonds",
+      "built": 1791709520434
+    }
+  }
+}

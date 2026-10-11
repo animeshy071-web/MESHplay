@@ -3,7 +3,7 @@
 A gaming OS for your PC. Console firmware feel — living wave wallpaper, crescent +
 row game scrollers, auto-built library, phone-as-controller, Game Bar, achievements.
 
-> **Status:** 🚀 **M1–M6 feature-complete · v0.4.0** — packaged offline `.exe` / `.msi` installers
+> **Status:** 🚀 **M1–M7 feature-complete · v0.5.0** — packaged offline `.exe` / `.msi` installers, 20 consoles embedded
 
 ## Docs
 
@@ -22,6 +22,7 @@ row game scrollers, auto-built library, phone-as-controller, Game Bar, achieveme
 
 ```powershell
 npm install
+npm run cores          # one-time: embed the 20 emulator cores (public/cores/)
 npm run tauri build   # → src-tauri/target/release/bundle/{msi,nsis}
 npm run dev           # dev shell + LAN remote server
 npm run test:gb       # Game Boy core smoke test (Node)
@@ -40,7 +41,9 @@ npm run test:gb       # Game Boy core smoke test (Node)
 | Online art (optional) | Steam store CDN (keyless) + SteamGridDB/RAWG/IGDB with user keys — Library 🌐 button or Add Game dialog |
 | Game Bar | Guide button / L1+R1+Select / Shift+Tab — perf, mixer, states, 60s rewind, filters, capture |
 | Settings suite | Real monitor/resolution/output-device selectors, sleep timer (standby), spatial widening, drift visualizer, 8-button remapper, ViGEm bridge check |
-| Emulation | CHIP-8 + Game Boy (SM83/PPU/APU/MBC) with save states, instant resume, rewind |
+| Emulation | CHIP-8 + Game Boy built-in (TypeScript) · **20 consoles embedded** via mini-RetroArch WASM cores (`public/cores/`) — NES, SNES, Genesis, SMS, GG, Sega CD, 32X, GBA, PCE, Neo Geo, Arcade, Coleco, A7800, Lynx, 3DO, Jaguar, **PS1, N64, Saturn, NDS** |
+| Core layer | Unified `EmuCore` contract (`src/cores/`) — rewind, states, Game Bar and filters are core-agnostic; per-platform ROM→core dispatch |
+| 4-player | Keyboard → P1, gamepads → P1–P4, phone remotes → pairing slots; every phone controller type routes in (gamepad, fight-stick, gyro wheel → analog, trackpad → pointer) |
 | M5 remap layer | Gamepad → keyboard/mouse for native games (`remap.ts`), wheel gyro → A/D steering, **anti-cheat auto-disable** (`anticheat.ts`) |
 | Spotify | Real Web API + PKCE auth (`spotify.ts`) — user's own Client ID, Premium for control |
 | Screensaver system | Music mode (art drift) → clock mode (gradient waves) → attract reels |

@@ -1,6 +1,6 @@
 [package]
 name = "meshplay"
-version = "0.4.0"
+version = "0.5.0"
 description = "MESHplay — a gaming OS for your PC"
 authors = ["animeshy071-web"]
 edition = "2021"

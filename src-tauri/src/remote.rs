@@ -46,7 +46,7 @@ fn broadcast_players(shared: &Shared) {
     }
 }
 
-fn relay_text(shared: &Shared, is_host: bool, text: &str) {
+fn relay_text(shared: &Shared, is_host: bool, player: u8, text: &str) {
     let hub = shared.lock().unwrap();
     if is_host {
         // host -> phones: rumble / find-my-controller pings
@@ -61,9 +61,24 @@ fn relay_text(shared: &Shared, is_host: bool, text: &str) {
         }
         return;
     }
-    // phone -> host: input / axes / mouse / click / gyro
+    // phone -> host: input / axes / mouse / click / gyro — tag every message
+    // with the sender's pairing slot so the app routes P1–P4 independently
     if let Some(host) = hub.host.and_then(|h| hub.senders.get(&h)) {
-        let _ = host.send(Message::Text(text.to_string()));
+        let tagged = if let Ok(mut msg) = serde_json::from_str::<Value>(text) {
+            let kind = msg.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            let is_input = matches!(kind, "input" | "axes" | "gyro" | "mouse" | "click");
+            if is_input {
+                if let Some(obj) = msg.as_object_mut() {
+                    obj.entry("player").or_insert(json!(player));
+                }
+                msg.to_string()
+            } else {
+                text.to_string()
+            }
+        } else {
+            text.to_string()
+        };
+        let _ = host.send(Message::Text(tagged));
     }
 }
 
@@ -125,7 +140,7 @@ fn ws_thread(
 
     loop {
         match ws.read() {
-            Ok(Message::Text(t)) => relay_text(&shared, is_host, &t),
+            Ok(Message::Text(t)) => relay_text(&shared, is_host, player, &t),
             Ok(Message::Close(_)) => break,
             Ok(_) => {} // ping (auto-ponged) / pong / binary / frame — keep alive
             Err(tungstenite::Error::Io(ref e)) if e.kind() == std::io::ErrorKind::WouldBlock => {}

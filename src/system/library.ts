@@ -8,8 +8,10 @@ import * as db from './db'
 import { tryInvoke, isTauri } from './ipc'
 import { matchRom, ensureBigDb } from './romdb'
 import { normalizeTitle } from './petools'
+import { LABEL_TO_PLATFORM, PLATFORM_BY_ID } from '../cores/registry'
 
-export type GameKind = 'chip8' | 'gb' | 'native'
+/** 'chip8' | 'gb' kept for legacy rows; other kinds are platform ids (nes, snes, psx …). */
+export type GameKind = 'chip8' | 'gb' | 'native' | (string & {})
 
 /** The unified game shape every screen consumes. */
 export interface Game {
@@ -350,17 +352,19 @@ export async function scanRomFolder(folder: string): Promise<RomScanResult> {
   let added = 0
   let recognized = 0
   for (const r of roms) {
-    const playable = r.platform === 'CHIP-8' || r.platform === 'Game Boy'
+    const kind = LABEL_TO_PLATFORM.get(r.platform)
+    const def = kind ? PLATFORM_BY_ID.get(kind) : undefined
+    const playable = !!def && def.tier !== 'bridge'
     const hit = r.crc32 ? matchRom(r.crc32) : null
     if (hit) recognized++
     const id = `rom-${r.crc32.toString(16)}`
-    if (existing.has(r.crc32) || !playable) continue
+    if (existing.has(r.crc32) || !playable || !kind) continue
     await db.upsertGame({
       id,
       title: hit?.title ?? titleFrom(r.name),
       tagline: r.platform,
       description: hit ? 'Identified by offline checksum match' : '',
-      kind: r.platform === 'CHIP-8' ? 'chip8' : 'gb',
+      kind,
       rom: r.path,
       exe_path: null,
       args: null,

@@ -11,7 +11,7 @@ export interface GameRow {
   title: string
   tagline: string
   description: string
-  kind: 'chip8' | 'gb' | 'native'
+  kind: string
   rom: string | null
   exe_path: string | null
   args: string | null

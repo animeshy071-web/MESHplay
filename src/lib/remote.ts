@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { isTauri, tryInvoke } from '../system/ipc'
 import { osKey } from '../system/oskb'
 import { setPhoneWheel } from '../system/input'
+import { movePhonePointer, setPhoneAxes, setPhoneButton, setPhonePress, setPhoneWheelCore } from '../cores/inputRouter'
 
 export type RemoteStatus = 'off' | 'connecting' | 'online' | 'error'
 
@@ -133,47 +134,64 @@ class RemoteHost {
     }, 2000)
   }
 
-  private handle(msg: { type: string; players?: number[]; action?: string; code?: string; lx?: number; ly?: number; rx?: number; ry?: number; lt?: number; rt?: number; dx?: number; dy?: number; button?: string; gamma?: number }): void {
+  private handle(msg: { type: string; players?: number[]; action?: string; code?: string; lx?: number; ly?: number; rx?: number; ry?: number; lt?: number; rt?: number; dx?: number; dy?: number; button?: string; gamma?: number; player?: number }): void {
     if (msg.type === 'players' && Array.isArray(msg.players)) {
       this.emit({ players: msg.players })
       return
     }
+    const player = typeof msg.player === 'number' ? msg.player : 1
     if (msg.type === 'input' && msg.code && (msg.action === 'down' || msg.action === 'up')) {
       const down = msg.action === 'down'
-      // Guide button: opens the in-game Game Bar
+      // emulator input router: every phone is a core port (P1–P4)
+      setPhoneButton(player, msg.code, down)
+      // Guide button: opens the in-game Game Bar (P1 only, like a console)
       if (msg.code === 'Guide') {
-        window.dispatchEvent(new CustomEvent('meshplay:gamebar-toggle', { detail: { source: 'phone-guide' } }))
+        if (player === 1) {
+          window.dispatchEvent(new CustomEvent('meshplay:gamebar-toggle', { detail: { source: 'phone-guide' } }))
+        }
         return
       }
-      // osKey: DOM event for the console + real OS injection while a native game runs
-      osKey(msg.code, down)
+      // P1 also drives the console OS via keyboard injection (as before)
+      if (player === 1) osKey(msg.code, down)
       return
     }
     if (msg.type === 'axes') {
-      // phone analog sticks + analog triggers feed the universal input layer
-      void import('../system/input').then(({ setPhoneAxes }) => {
-        setPhoneAxes([msg.lx ?? 0, msg.ly ?? 0, msg.rx ?? 0, msg.ry ?? 0, msg.lt ?? 0, msg.rt ?? 0])
-      })
+      // emulator ports first — then P1 also feeds the universal input layer
+      setPhoneAxes(player, [msg.lx ?? 0, msg.ly ?? 0, msg.rx ?? 0, msg.ry ?? 0, msg.lt ?? 0, msg.rt ?? 0])
+      if (player === 1) {
+        void import('../system/input').then(({ setPhoneAxes }) => {
+          setPhoneAxes([msg.lx ?? 0, msg.ly ?? 0, msg.rx ?? 0, msg.ry ?? 0, msg.lt ?? 0, msg.rt ?? 0])
+        })
+      }
       return
     }
     if (msg.type === 'gyro') {
-      // wheel mode: gyro steering for the remap layer (native games)
-      void import('../system/input').then(({ setPhoneWheel }) => {
-        setPhoneWheel(msg.gamma ?? 0, true)
-      })
+      // wheel mode: gyro steering → analog axis on the phone's core port
+      setPhoneWheelCore(player, msg.gamma ?? 0)
+      if (player === 1) {
+        void import('../system/input').then(({ setPhoneWheel }) => {
+          setPhoneWheel(msg.gamma ?? 0, true)
+        })
+      }
       return
     }
     if (msg.type === 'mouse' && typeof msg.dx === 'number' && typeof msg.dy === 'number') {
-      // trackpad mode: real OS cursor movement (Tauri SendInput)
-      void import('../system/ipc').then(({ tryInvoke }) => {
-        void tryInvoke('send_mouse_move', { dx: msg.dx, dy: msg.dy })
-      })
+      // trackpad mode: absolute pointer for touch/pointer cores (NDS …)
+      movePhonePointer(player, msg.dx, msg.dy)
+      if (player === 1) {
+        void import('../system/ipc').then(({ tryInvoke }) => {
+          void tryInvoke('send_mouse_move', { dx: msg.dx, dy: msg.dy })
+        })
+      }
       return
     }
     if (msg.type === 'click' && msg.button) {
-      void import('../system/ipc').then(({ tryInvoke }) => {
-        void tryInvoke('send_mouse_click', { button: msg.button })
-      })
+      setPhonePress(player, msg.button === 'left')
+      if (player === 1) {
+        void import('../system/ipc').then(({ tryInvoke }) => {
+          void tryInvoke('send_mouse_click', { button: msg.button })
+        })
+      }
       return
     }
   }

@@ -21,20 +21,81 @@ fn platform_for(ext: &str) -> Option<&'static str> {
         "ch8" => "CHIP-8",
         "gb" | "gbc" => "Game Boy",
         "gba" => "Game Boy Advance",
-        "nes" => "NES",
-        "fds" => "NES",
+        "nes" | "fds" | "unf" => "NES",
         "sfc" | "smc" => "SNES",
         "sms" => "Master System",
         "gg" => "Game Gear",
-        "md" | "gen" => "Mega Drive",
-        "pce" => "PC Engine",
+        "md" | "gen" | "smd" => "Mega Drive",
+        "32x" => "Sega 32X",
+        "pce" | "sgx" => "PC Engine",
         "n64" | "z64" | "v64" => "Nintendo 64",
         "a26" => "Atari 2600",
         "a78" => "Atari 7800",
+        "lnx" => "Atari Lynx",
         "col" => "ColecoVision",
-        "vect" => "Vectrex",
+        "vect" | "vec" => "Vectrex",
+        "ws" | "wsc" => "WonderSwan",
+        "mx1" | "mx2" | "dsk" => "MSX",
+        "nds" => "Nintendo DS",
         _ => return None,
     })
+}
+
+/// Disc/tape/zip images are ambiguous by extension — the parent folder names
+/// the system (e.g. "ROMs/PS1/", "Games/Wii/"). Cartridge extensions above are
+/// unambiguous and take priority.
+fn disc_platform(path: &Path) -> Option<&'static str> {
+    let hay = format!(
+        "{} {}",
+        path.parent().map(|p| p.to_string_lossy()).unwrap_or_default(),
+        path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+    )
+    .to_lowercase();
+    let has = |needle: &str| hay.contains(needle);
+    if has("ps3") || has("rpcs3") {
+        return Some("PlayStation 3");
+    }
+    if has("ps2") || has("playstation2") {
+        return Some("PlayStation 2");
+    }
+    if has("psx") || has("ps1") || has("playstation") {
+        return Some("PlayStation");
+    }
+    if has("dreamcast") {
+        return Some("Dreamcast");
+    }
+    if has("saturn") {
+        return Some("Sega Saturn");
+    }
+    if has("gamecube") {
+        return Some("GameCube");
+    }
+    if has("wii") && !has("gamecube") {
+        return Some("Wii");
+    }
+    if has("psp") {
+        return Some("PSP");
+    }
+    if has("3ds") {
+        return Some("Nintendo 3DS");
+    }
+    if has("segacd") || has("segacd") || has("mega cd") || has("megacd") {
+        return Some("Sega CD");
+    }
+    if has("pcfx") || has("pc-fx") {
+        return Some("PC-FX");
+    }
+    if has("neogeo") || has("neo geo") {
+        return Some("Neo Geo");
+    }
+    if has("arcade") || has("mame") || has("fbneo") || has("fba") {
+        return Some("Arcade");
+    }
+    None
+}
+
+fn is_disc_ext(ext: &str) -> bool {
+    matches!(ext, "cue" | "iso" | "chd" | "img" | "pbp" | "cso" | "gcm" | "rvz" | "gdi" | "cdi" | "ccd" | "toc" | "zip" | "7z")
 }
 
 fn crc32_of(path: &Path, cap: u64) -> std::io::Result<u32> {
@@ -86,12 +147,24 @@ fn walk(dir: &Path, depth: u32, out: &mut Vec<RomInfo>) {
                 .extension()
                 .map(|e| e.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
-            let Some(platform) = platform_for(&ext) else { continue };
+            let platform = match platform_for(&ext) {
+                Some(pl) => Some(pl),
+                None if is_disc_ext(&ext) => disc_platform(&p),
+                None => None,
+            };
+            let Some(platform) = platform else { continue };
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-            if size == 0 || size > 256 * 1024 * 1024 {
+            let disc = is_disc_ext(&ext);
+            let max = if disc { 8u64 * 1024 * 1024 * 1024 } else { 256 * 1024 * 1024 };
+            if size == 0 || size > max {
                 continue;
             }
-            let crc = crc32_of(&p, 128 * 1024 * 1024).unwrap_or(0);
+            // CRC hashing only helps cartridge-sized ROMs; disc images skip it
+            let crc = if disc || size > 512 * 1024 * 1024 {
+                0
+            } else {
+                crc32_of(&p, 128 * 1024 * 1024).unwrap_or(0)
+            };
             let name = p
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())

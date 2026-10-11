@@ -4,7 +4,7 @@
 > dresses them in living color, and plays them with a controller, a phone, or a
 > steering wheel. Built to run at 60fps on any modern Windows PC.
 
-**Status**: M1–M6 feature-complete · v0.4.0 (offline .exe/.msi shipped)
+**Status**: M1–M7 feature-complete · v0.5.0 (offline .exe/.msi shipped)
 **Owner**: @animeshy071-web · **Repo ritual**: push + tag after every milestone
 
 ---
@@ -181,6 +181,15 @@ colors) and the wallpaper blobs morph toward it.
 - **Offline Standalone Windows .exe**: Tauri packaging + standalone MSI/EXE installer with all runtimes bundled; runs 100% offline out of the box with zero dependencies.
 - **Spotify connection** (now-playing chip, in-game mixer control, Spotify-device throw — Premium required for control/playback), **screensaver system** (music mode w/ art drift → clock mode w/ gradient waves → attract reels), themes unlockables, screenshots gallery, storage manager, profile & playtime stats, laptop/battery mode, Windows game mode toggle, controller health (drift test), bedtime wind-down, konami code.
 
+**M7 — Universal Emulation Core Layer (Everything Up to PS3, Zero Extra Downloads)**:
+- **Unified core contract** (`src/cores`): every emulator — built-in CHIP-8/Game Boy or bundled WASM — implements one `EmuCore` interface; PlayView, rewind, save states, Game Bar, filters and the input router are fully core-agnostic.
+- **Mini-RetroArch core driver** (`ejs.ts`): runs official emscripten core builds embedded in the app (`public/cores/<core>/`) — internal main loop, audio, GL/2D rendering into the game canvas, save states, SRAM, 4-port controller bus.
+- **Bundled cores** (`npm run cores`): NES, SNES, Genesis/Mega Drive, Master System, Game Gear, Sega CD, 32X, GBA, PC Engine, Neo Geo, Arcade (FBNeo), ColecoVision, Atari 7800, Atari Lynx, 3DO, Atari Jaguar, **PlayStation, Nintendo 64, Sega Saturn, Nintendo DS** — 20 platforms embedded, zero user downloads. Registry stays honest for platforms awaiting public WASM builds (A2600, Vectrex, WonderSwan, MSX, Dreamcast, PSP, PS2, GC, Wii, 3DS) — they light up the moment a build lands.
+- **4-player input router**: keyboard → P1, physical gamepads → ports in enumeration order, phone remotes → pairing slots P1–P4. Phone controller types all route in: gamepad, arcade fight-stick, gyro wheel (→ analog axis), trackpad (→ pointer/touch).
+- **Per-player phone tagging**: the native LAN server (`remote.rs`) tags every input message with the sender's pairing slot; P1 keeps OS/console injection, P2–P4 go straight to emulator ports.
+- **Scanner expansion** (`roms.rs`): all cartridge extensions recognized + disc images (cue/iso/chd/…) platform-matched by folder naming; archive zips (Neo Geo/Arcade) detected.
+- **PS3 remains bridge-tier by design** (RPCS3-class problem — see Honest Limits).
+
 ### Personal features (user-specified, sacred)
 1. **Offline Standalone Windows App** — One self-contained `.exe` installer, 100% offline functionality, embedded database, zero account required.
 2. **Offline Phone Controller App** — Complete console controller UI over local network / hotspot (D-pad, ABXY, dual sticks, triggers, wheel gyro, fightstick, trackpad).
@@ -225,3 +234,4 @@ Cloud-save sync (user's own Drive/WebDAV) · achievement auto-clips · save vers
 - [x] **M4 — Deep Emulation & Floating In-Game Game Bar** (GB core, states, rewind, floating Game Bar with stats/mixer/filters/capture, **RetroAchievements**, Find My Controller, **Mood Recommender**)
 - [x] **M5 — Universal Controller Layer** (gamepad→keyboard/mouse remap with OS injection, wheel/pedal mapping, ViGEm bridge status+guide, **anti-cheat auto-disable**)
 - [x] **M6 — Ship & Polish (Offline Standalone PC App)** (Tauri .exe/.msi packaging, 100% offline mode, **real Spotify Connect (PKCE)**, screensaver system, gallery, storage manager, diagnostics)
+- [x] **M7 — Universal Emulation Core Layer** (unified core contract, mini-RetroArch WASM driver, **20 consoles embedded** — NES→NDS incl. PS1/N64/Saturn, 4-player input router, per-player phone tagging, disc-image scanner)

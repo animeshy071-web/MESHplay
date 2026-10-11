@@ -1,20 +1,25 @@
-// Gameplay screen for CHIP-8 and Game Boy cores: emulator loop, procedural
-// beep, pause menu, save states with thumbnails, instant resume, 60-second
-// continuous rewind, retro display filters, and the floating Game Bar
-// (Guide button / L1+R1+Select / Shift+Tab).
+// Gameplay screen — core-agnostic emulator loop driven by src/cores. Runs the
+// built-in CHIP-8 / Game Boy cores and any bundled libretro WASM core (NES,
+// SNES, Genesis, GBA, PS1 … up to four players from keyboard, physical
+// gamepads and phone remotes). Features: save states with thumbnails, instant
+// resume, 60-second continuous rewind, retro display filters, replay capture,
+// and the floating Game Bar (Guide button / L1+R1+Select / Shift+Tab).
 
 import { useEffect, useRef, useState } from 'react'
-import { Chip8, KEY_MAP } from '../chip8/core'
-import { GameBoy, GB_W, GB_H, type GbButton } from '../gb/gb'
 import type { Game } from '../system/library'
 import { sfx } from '../system/mixer'
 import { beginSession, endSession } from '../lib/playtime'
-import { perfSampler } from '../system/stats'
 import { createRewind, type Rewind } from '../system/rewind'
 import { canvasStyleFor, overlayStyleFor, type FilterMode } from '../system/filters'
 import { ReplayBuffer, captureScreenshot } from '../system/capture'
 import { tryInvoke } from '../system/ipc'
 import * as db from '../system/db'
+import {
+  applyPortsToCore, createCore, coreStatusLine, keyToButton, platformForKind,
+  setKeyboardButton, setKeyboardStick,
+  type EmuCore, type PlatformDef,
+} from '../cores'
+import { LibretroCore } from '../cores/libretro'
 import LoadingRing from './LoadingRing'
 import GameBar from './GameBar'
 
@@ -40,18 +45,16 @@ interface Props {
   vsync: boolean
 }
 
-const CANVAS_W = 768
-const CANVAS_H = 384
-const GB_CANVAS_W = 960
-const GB_CANVAS_H = 864
-
 export default function PlayView({ game, onExit, filterMode, onFilterChange, smooth, targetFps, vsync }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const coreRef = useRef<Chip8 | GameBoy | null>(null)
+  const coreRef = useRef<EmuCore | null>(null)
   const romRef = useRef<Uint8Array | null>(null)
+  const realPathRef = useRef<string | null>(null)
   const rewindRef = useRef<Rewind | null>(null)
   const pausedRef = useRef(false)
   const [status, setStatus] = useState<'loading' | 'running' | 'error'>('loading')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [platDef, setPlatDef] = useState<PlatformDef | null>(platformForKind(game.kind) ?? null)
   const [paused, setPaused] = useState(false)
   const [pauseSel, setPauseSel] = useState(0)
   const [fps, setFps] = useState(60)
@@ -59,7 +62,6 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
   const [gameBarOpen, setGameBarOpen] = useState(false)
   const gameBarApiRef = useRef<GameBarApi | null>(null)
   const replayRef = useRef<ReplayBuffer>(new ReplayBuffer())
-  const isGb = game.kind === 'gb'
 
   const PAUSE_ITEMS = ['Resume', 'Save State', 'Load State', 'Restart', 'Quit to Home']
 
@@ -75,8 +77,10 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
     let fpsT = performance.now()
     let lastFrame = 0
 
+    // ---------- audio ----------
     let audioCtx: AudioContext | null = null
-    let gain: GainNode | null = null
+    let gain: GainNode | null = null // CHIP-8-style beep gain
+    let scriptNode: ScriptProcessorNode | null = null
     try {
       audioCtx = new AudioContext()
       const osc = audioCtx.createOscillator()
@@ -91,63 +95,67 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
       audioCtx = null
     }
 
-    // persistent buffers — zero allocation in the render path
-    const isGbCore = game.kind === 'gb'
+    const beepGain = () => {
+      const core = coreRef.current
+      if (!gain) return
+      const level = core?.beep?.() ?? 0
+      gain.gain.value = level > 0 ? level * 0.09 : 0
+    }
+
+    /** Libretro cores stream real samples through a ring buffer. */
+    const attachStreamAudio = (core: LibretroCore) => {
+      if (!audioCtx || scriptNode) return
+      try {
+        const node = audioCtx.createScriptProcessor(4096, 1, 2)
+        const sink = new Float32Array(8192)
+        node.onaudioprocess = (ev) => {
+          const n = core.audio.pull(sink)
+          const L = ev.outputBuffer.getChannelData(0)
+          const R = ev.outputBuffer.getChannelData(1)
+          for (let i = 0; i < L.length; i++) {
+            L[i] = sink[i * 2] ?? 0
+            R[i] = sink[i * 2 + 1] ?? L[i]
+          }
+          void n
+        }
+        node.connect(audioCtx.destination)
+        scriptNode = node
+      } catch {
+        scriptNode = null
+      }
+    }
+
+    // ---------- rendering ----------
     const off = document.createElement('canvas')
-    off.width = isGbCore ? GB_W : 64
-    off.height = isGbCore ? GB_H : 32
     const offCtx = off.getContext('2d')!
-    const img = offCtx.createImageData(off.width, off.height)
+    let img: ImageData | null = null
 
-    const renderChip8 = (core: Chip8) => {
+    const renderCore = (core: EmuCore) => {
       const canvas = canvasRef.current
       if (!canvas) return
+      const { width: w, height: h, pixels } = core.video
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+        off.width = w
+        off.height = h
+        img = offCtx.createImageData(w, h)
+      }
+      if (!img) return
+      new Uint32Array(img.data.buffer).set(pixels)
+      offCtx.putImageData(img, 0, 0)
       const ctx = canvas.getContext('2d')
       if (!ctx) return
-      const px = img.data
-      for (let i = 0; i < 64 * 32; i++) {
-        const on = core.display[i]
-        px[i * 4] = on ? 255 : 0
-        px[i * 4 + 1] = on ? 255 : 0
-        px[i * 4 + 2] = on ? 255 : 0
-        px[i * 4 + 3] = on ? 255 : 0
-      }
-      offCtx.putImageData(img, 0, 0)
       ctx.imageSmoothingEnabled = false
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-      ctx.drawImage(off, 0, 0, CANVAS_W, CANVAS_H)
+      ctx.drawImage(off, 0, 0)
     }
 
-    const renderGb = (core: GameBoy) => {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      const fb = core.ppu.framebuffer
-      const px = img.data
-      for (let i = 0; i < GB_W * GB_H; i++) {
-        const c = fb[i]
-        px[i * 4] = c & 0xff
-        px[i * 4 + 1] = (c >> 8) & 0xff
-        px[i * 4 + 2] = (c >> 16) & 0xff
-        px[i * 4 + 3] = 0xff
-      }
-      offCtx.putImageData(img, 0, 0)
-      ctx.imageSmoothingEnabled = false
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, GB_CANVAS_W, GB_CANVAS_H)
-      ctx.drawImage(off, 0, 0, GB_CANVAS_W, GB_CANVAS_H)
-    }
-
+    // ---------- frame loop ----------
     const step = (now: number) => {
       raf = requestAnimationFrame(step)
       const core = coreRef.current
       if (!core) return
 
-      // Frame budget: target FPS limiter + V-Sync frame pacing.
-      // vsync on + uncapped → natural rAF pacing (display refresh).
-      // otherwise → gate to the target (30/60/120) or a 240 fps soft cap.
       const cap = targetFpsRef.current > 0 ? targetFpsRef.current : vsyncRef.current ? 0 : 240
       if (cap > 0 && now - lastFrame < 1000 / cap - 1) return
       lastFrame = now
@@ -159,46 +167,42 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
         fpsT = now
       }
 
+      // self-rendering cores (mini-RetroArch builds) own their loop, canvas
+      // and audio — we only feed inputs and manage pause; the rewind buffer
+      // stays off (they carry hundreds-of-MB states, their own rewind exists)
+      if (core.selfRender) {
+        const wantRunning = !pausedRef.current && !gameBarOpenRef.current
+        core.setRunning?.(wantRunning)
+        if (pausedRef.current) return
+        applyPortsToCore(core)
+        return
+      }
+
       if (pausedRef.current) {
         if (gain) gain.gain.value = 0
         return
       }
 
-      if (core instanceof Chip8) {
-        for (let j = 0; j < 11; j++) core.cycle()
-        core.tickTimers()
-        if (gain) gain.gain.value = core.soundOn ? 0.03 : 0
-        if (core.drawFlag) {
-          renderChip8(core)
-          core.drawFlag = false
-        }
-        rewindRef.current?.tick()
-      } else if (core instanceof GameBoy) {
-        core.runFrame()
-        // GB audio feeds the mixer's game channel (procedural, no files)
-        if (gain) gain.gain.value = 0
-        rewindRef.current?.tick()
-      }
-    }
+      // pace to the emulated machine's native refresh (59.73, 60, 75.47 …)
+      if (now - lastCoreFrame < 1000 / core.fps - 2.2) return
+      lastCoreFrame = now
 
-    const setPausedBoth = (p: boolean) => {
-      pausedRef.current = p
-      setPaused(p)
-      setPauseSel(0)
+      // gather inputs from keyboard + gamepads + phones, then run
+      if (!(core instanceof LibretroCore)) applyPortsToCore(core)
+      core.runFrame()
+      renderCore(core)
+      beepGain()
+      rewindRef.current?.tick()
     }
+    let lastCoreFrame = 0
 
-    // GB keyboard controls: arrows + Z/X = B/A, Enter = Start, Shift = Select
-    const GB_KEYS: Record<string, GbButton> = {
-      ArrowRight: 'right', ArrowLeft: 'left', ArrowUp: 'up', ArrowDown: 'down',
-      KeyX: 'a', KeyZ: 'b', Enter: 'start', ShiftRight: 'select', ShiftLeft: 'select',
-    }
-
+    // ---------- keyboard ----------
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const core = coreRef.current
       if (!core) return
 
-      // Game Bar toggle: Guide button (handled via input layer event), Shift+Tab, Esc while playing
-      if (down && !e.repeat && (e.code === 'Escape' || e.shiftKey && e.code === 'Tab')) {
+      // Game Bar toggle: Esc / Shift+Tab while playing
+      if (down && !e.repeat && (e.code === 'Escape' || (e.shiftKey && e.code === 'Tab'))) {
         e.preventDefault()
         if (e.code === 'Escape' && gameBarOpenRef.current) {
           sfx.back()
@@ -214,20 +218,14 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
         return
       }
 
-      if (core instanceof Chip8) {
-        const chipKey = KEY_MAP[e.code]
-        if (chipKey !== undefined) {
-          e.preventDefault()
-          core.keys[chipKey] = down ? 1 : 0
-          return
+      const btn = keyToButton(e.code, {})
+      if (btn) {
+        e.preventDefault()
+        setKeyboardButton(btn, down)
+        if (btn === 'up' || btn === 'down' || btn === 'left' || btn === 'right') {
+          setKeyboardStick(btn, down)
         }
-      } else if (core instanceof GameBoy) {
-        const gbBtn = GB_KEYS[e.code]
-        if (gbBtn !== undefined) {
-          e.preventDefault()
-          core.setButton(gbBtn, down)
-          return
-        }
+        return
       }
 
       if (!down || e.repeat) return
@@ -253,14 +251,17 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
     }
     window.addEventListener('meshplay:gamebar-toggle', onGuide)
 
+    // ---------- load ----------
     const loadRom = async () => {
       try {
         let bytes: Uint8Array
+        let realPath: string | null = null
         if (game.rom && (game.rom.includes('\\') || game.rom.includes('/'))) {
           // absolute path (scanned ROM): read from disk via Tauri
           const b64 = await tryInvoke<string>('read_rom_bytes', { path: game.rom })
           if (!b64) throw new Error('ROM unreadable')
           bytes = base64ToBytes(b64)
+          realPath = game.rom
         } else {
           const r = await fetch(`${import.meta.env.BASE_URL}roms/${game.rom}`)
           if (!r.ok) throw new Error('ROM missing')
@@ -268,36 +269,30 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
         }
         if (cancelled) return
         romRef.current = bytes
+        realPathRef.current = realPath
 
-        let core: Chip8 | GameBoy
-        if (isGbCore) {
-          core = new GameBoy(bytes)
-          core.apu.attachAudio()
-        } else {
-          core = new Chip8(bytes)
+        const created = await createCore(game, bytes, canvasRef.current, realPath)
+        if (cancelled) {
+          created.core?.destroy?.()
+          return
         }
-        coreRef.current = core
+        if (!created.core) throw new Error(created.error ?? 'core failed to load')
+        coreRef.current = created.core
+        setPlatDef(created.platform ?? platformForKind(game.kind) ?? null)
+
+        if (created.core instanceof LibretroCore) attachStreamAudio(created.core)
 
         // Instant Resume: continue exactly where the last session ended
         const auto = await db.getSaveState(game.id, 'auto')
-        if (auto?.data) {
-          const ok = core instanceof Chip8 ? (core as Chip8).restore(auto.data) : (core as GameBoy).restore(auto.data)
-          if (ok) {
-            setResumed(true)
-            setTimeout(() => setResumed(false), 2200)
-          }
+        if (auto?.data && created.core.restore(auto.data)) {
+          setResumed(true)
+          setTimeout(() => setResumed(false), 2200)
         }
 
         // rewind engine: 240 snapshots at 250ms = 60s
         rewindRef.current = createRewind(
-          () => (core instanceof Chip8 ? (core as Chip8).serialize() : (core as GameBoy).serialize()),
-          (data): boolean => {
-            if (core instanceof Chip8) {
-              ;(core as Chip8).restore(data)
-              return true
-            }
-            return (core as GameBoy).restore(data)
-          },
+          () => coreRef.current?.serialize() ?? '',
+          (data) => coreRef.current?.restore(data) ?? false,
         )
 
         // rolling replay recorder on the game canvas
@@ -305,9 +300,13 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
         if (canvas) replayRef.current.start(canvas)
 
         setStatus('running')
+        lastCoreFrame = 0
         raf = requestAnimationFrame(step)
-      } catch {
-        if (!cancelled) setStatus('error')
+      } catch (err) {
+        if (!cancelled) {
+          setErrorMsg(err instanceof Error ? err.message : String(err))
+          setStatus('error')
+        }
       }
     }
     void loadRom()
@@ -319,20 +318,20 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
       window.removeEventListener('keyup', ku)
       window.removeEventListener('meshplay:gamebar-toggle', onGuide)
       replayRef.current.stop()
-      if (coreRef.current instanceof GameBoy) {
-        coreRef.current.apu.detachAudio()
-      }
-      if (audioCtx) void audioCtx.close()
+      scriptNode?.disconnect()
       // Instant Resume: freeze this exact moment for next time
       const core = coreRef.current
       if (core && romRef.current) {
         try {
-          const data = core instanceof Chip8 ? (core as Chip8).serialize() : (core as GameBoy).serialize()
-          void db.putSaveState(game.id, 'auto', data, null)
+          const data = core.serialize()
+          if (data) void db.putSaveState(game.id, 'auto', data, null)
         } catch {
           /* storage full — skip resume save */
         }
       }
+      coreRef.current?.destroy?.()
+      coreRef.current = null
+      if (audioCtx) void audioCtx.close()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id, game.kind])
@@ -351,6 +350,19 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
   const vsyncRef = useRef(vsync)
   vsyncRef.current = vsync
 
+  /** Fresh core for restart / soft reset (same ROM, clean machine). */
+  const recreateCore = () => {
+    const rom = romRef.current
+    if (!rom) return
+    coreRef.current?.destroy?.()
+    void createCore(game, rom, null, realPathRef.current).then((created) => {
+      if (created.core) coreRef.current = created.core
+    })
+    rewindRef.current?.clear()
+    void db.deleteSaveState(game.id, 'auto')
+    setResumed(false)
+  }
+
   const pauseAction = (i: number) => {
     const core = coreRef.current
     if (i === 0) {
@@ -359,33 +371,25 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
       setPaused(false)
     } else if (i === 1 && core) {
       void (async () => {
-        const data = core instanceof Chip8 ? (core as Chip8).serialize() : (core as GameBoy).serialize()
+        const data = core.serialize()
         const canvas = canvasRef.current
         const thumb = canvas ? await captureThumbnail(canvas) : null
-        await db.putSaveState(game.id, 'manual', data, thumb)
+        if (data) await db.putSaveState(game.id, 'manual', data, thumb)
         sfx.select()
       })()
     } else if (i === 2 && core) {
       void (async () => {
         const st = await db.getSaveState(game.id, 'manual')
-        if (st?.data) {
-          const ok = core instanceof Chip8 ? (core as Chip8).restore(st.data) : (core as GameBoy).restore(st.data)
-          if (ok) {
-            sfx.select()
-            pausedRef.current = false
-            setPaused(false)
-            return
-          }
+        if (st?.data && core.restore(st.data)) {
+          sfx.select()
+          pausedRef.current = false
+          setPaused(false)
+          return
         }
         sfx.error()
       })()
     } else if (i === 3 && romRef.current) {
-      const fresh = romRef.current
-      coreRef.current = game.kind === 'gb' ? new GameBoy(fresh) : new Chip8(fresh)
-      if (coreRef.current instanceof GameBoy) coreRef.current.apu.attachAudio()
-      rewindRef.current?.clear()
-      void db.deleteSaveState(game.id, 'auto')
-      setResumed(false)
+      recreateCore()
       sfx.select()
       pausedRef.current = false
       setPaused(false)
@@ -409,10 +413,10 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
         saveState: async (slot: string) => {
           const core = coreRef.current
           if (!core) return null
-          const data = core instanceof Chip8 ? (core as Chip8).serialize() : (core as GameBoy).serialize()
+          const data = core.serialize()
           const canvas = canvasRef.current
           const thumb = canvas ? await captureThumbnail(canvas) : null
-          await db.putSaveState(game.id, slot, data, thumb)
+          if (data) await db.putSaveState(game.id, slot, data, thumb)
           return thumb
         },
         loadState: async (slot: string): Promise<boolean> => {
@@ -420,11 +424,7 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
           if (!core) return false
           const st = await db.getSaveState(game.id, slot)
           if (!st?.data) return false
-          if (core instanceof Chip8) {
-            ;(core as Chip8).restore(st.data)
-            return true
-          }
-          return (core as GameBoy).restore(st.data)
+          return core.restore(st.data)
         },
         listStates: async () => {
           const rows = await db.listSaveStates(game.id)
@@ -434,14 +434,7 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
         },
         rewind: (secondsBack: number) => rewindRef.current?.seek(secondsBack) ?? false,
         rewindDepth: () => rewindRef.current?.depth() ?? 0,
-        softReset: () => {
-          const rom = romRef.current
-          if (!rom) return
-          const fresh = game.kind === 'gb' ? new GameBoy(rom) : new Chip8(rom)
-          if (fresh instanceof GameBoy) fresh.apu.attachAudio()
-          coreRef.current = fresh
-          rewindRef.current?.clear()
-        },
+        softReset: () => recreateCore(),
         exit: () => onExitRef.current(),
       }
     }
@@ -450,9 +443,7 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
 
   const canvasStyle = canvasStyleFor(filterMode, smooth)
   const overlayStyle = overlayStyleFor(filterMode)
-  const dims = isGb
-    ? { width: GB_CANVAS_W, height: GB_CANVAS_H, cssW: 'min(80vw, 640px)', ratio: '10 / 9' }
-    : { width: CANVAS_W, height: CANVAS_H, cssW: 'min(88vw, 900px)', ratio: '2 / 1' }
+  const aspect = platDef?.aspect ?? 4 / 3
 
   return (
     <div className="absolute inset-0 z-30 bg-black anim-fade-in">
@@ -461,12 +452,10 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
           <div className="relative">
             <canvas
               ref={canvasRef}
-              width={dims.width}
-              height={dims.height}
               className="rounded-xl"
               style={{
-                width: dims.cssW,
-                aspectRatio: dims.ratio,
+                width: 'min(84vw, 920px)',
+                aspectRatio: `${aspect}`,
                 boxShadow: `0 0 80px -18px ${game.colors[0]}, 0 30px 80px -30px rgba(0,0,0,0.9)`,
                 ...canvasStyle,
               } as React.CSSProperties}
@@ -476,17 +465,17 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
               className="pointer-events-none absolute inset-0"
               style={overlayStyle as React.CSSProperties}
             />
-            <div className="absolute -top-9 left-1 text-sm font-bold text-white/60">{game.title.toUpperCase()}</div>
+            <div className="absolute -top-9 left-1 text-sm font-bold text-white/60">
+              {game.title.toUpperCase()}
+            </div>
             {resumed && (
               <div className="absolute -top-9 right-1 rounded-full bg-[var(--acc)]/25 px-3 py-1 text-[11px] font-bold text-[var(--acc)] anim-fade-in">
                 ⟲ Resumed where you left off
               </div>
             )}
-            {isGb && (
-              <div className="absolute -bottom-8 left-1 text-[11px] font-semibold text-white/35">
-                Game Boy · Arrows + Z(X/B) X(A) · Enter Start · Shift Select · Esc Game Bar
-              </div>
-            )}
+            <div className="absolute -bottom-8 left-1 text-[11px] font-semibold text-white/35">
+              {platDef ? coreStatusLine(platDef) : ''} · Esc Game Bar
+            </div>
           </div>
         </div>
       )}
@@ -494,6 +483,7 @@ export default function PlayView({ game, onExit, filterMode, onFilterChange, smo
       {status === 'error' && (
         <div className="flex h-full flex-col items-center justify-center gap-3">
           <div className="text-2xl font-bold">Game failed to load</div>
+          <div className="max-w-xl text-center text-sm text-white/50">{errorMsg || 'The core refused this ROM'}</div>
           <div className="text-sm text-white/50">Press Esc to open the Game Bar and exit</div>
         </div>
       )}
