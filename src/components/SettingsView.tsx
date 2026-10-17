@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { THEMES } from '../lib/themes'
-import type { Settings, Quality, DisplayMode, FilterMode, ScreensaverMode } from '../lib/settings'
+import type { Settings, Quality, DisplayMode, FilterMode, ScreensaverMode, HomeMode } from '../lib/settings'
 import { sfx } from '../system/mixer'
 import { createRepeater, type Repeater } from '../lib/repeat'
 import { computeBadges, loadProfile, saveProfile, AVATAR_COUNT, AVATAR_PALETTES, type Profile, type Badge } from '../system/profile'
@@ -181,7 +181,7 @@ export default function SettingsView({ settings, onChange, onBack, toast, onOpen
       name: 'General',
       rows: [
         { label: 'Theme', value: () => THEMES.find((t) => t.id === settings.theme)?.name ?? '', action: () => { const ids = THEMES.map((t) => t.id); const i = (ids.indexOf(settings.theme) + 1) % ids.length; set('theme', ids[i]); sfx.theme(); toast(`Theme: ${THEMES[i].name}`) } },
-        { label: 'Default view', value: () => (settings.defaultView === 'row' ? 'Xbox Dashboard' : 'Orbital Crescent'), action: () => { set('defaultView', settings.defaultView === 'row' ? 'crescent' : 'row'); sfx.select() } },
+        { label: 'Default view', value: () => ({ xmb: 'Wave XMB', row: 'Xbox Dashboard', crescent: 'Orbital Crescent' })[settings.defaultView] ?? 'Wave XMB', action: () => { const order: Array<HomeMode> = ['xmb', 'row', 'crescent']; set('defaultView', order[(order.indexOf(settings.defaultView) + 1) % order.length]); sfx.select() } },
         { label: 'Boot animation', value: () => (settings.bootAnimation ? 'On' : 'Off'), action: () => { set('bootAnimation', !settings.bootAnimation); sfx.select() } },
         { label: 'Reduce motion', value: () => (settings.reduceMotion ? 'On' : 'Off'), action: () => { set('reduceMotion', !settings.reduceMotion); sfx.select() } },
         { label: 'Adaptive quality', value: () => (settings.adaptiveQuality ? 'On' : 'Off'), action: () => { set('adaptiveQuality', !settings.adaptiveQuality); sfx.select() } },

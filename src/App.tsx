@@ -6,6 +6,7 @@ import Hints, { type HintItem } from './components/Hints'
 import Toasts, { type Toast } from './components/Toasts'
 import Boot from './components/Boot'
 import OrbitalCrescent from './components/OrbitalCrescent'
+import XmbHome from './components/XmbHome'
 import HeroGame from './components/HeroGame'
 import LastPlayedCarousel from './components/LastPlayedCarousel'
 import Row from './components/Row'
@@ -611,9 +612,25 @@ export default function App() {
         />
       )}
 
-      {/* Home View: Switchable between Xbox Horizontal Dashboard and Orbital Crescent */}
+      {/* Home View: XMB (PSP×Xbox) · Xbox Horizontal Dashboard · Orbital Crescent */}
       {view === 'home' && (
-        mode === 'row' ? (
+        mode === 'xmb' ? (
+          <div className="absolute inset-0 z-20 overflow-hidden select-none">
+            <XmbHome
+              games={games}
+              onLaunch={(g) => startLaunch(g)}
+              onOpenDetails={(g) => {
+                const idx = games.findIndex((item) => item.id === g.id)
+                if (idx !== -1) setSel(idx)
+                setView('detail')
+              }}
+              onOpenSettings={openSettings}
+              onOpenFiles={() => setIsFilesOpen(true)}
+              onOpenSpotify={() => setIsSpotifyOpen(true)}
+              onOpenLibrary={() => setIsFilesOpen(true)}
+            />
+          </div>
+        ) : mode === 'row' ? (
           <Row
             games={games}
             sel={sel}

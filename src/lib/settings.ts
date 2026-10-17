@@ -1,4 +1,4 @@
-export type HomeMode = 'crescent' | 'row'
+export type HomeMode = 'xmb' | 'crescent' | 'row'
 export type Quality = 'high' | 'balanced' | 'eco'
 export type DisplayMode = 'fullscreen' | 'borderless' | 'windowed'
 export type FilterMode = 'off' | 'crt' | 'lcd' | 'sharp' | 'smooth'
@@ -56,7 +56,7 @@ const KEY = 'meshplay.settings.v1'
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'violet',
-  defaultView: 'row',
+  defaultView: 'xmb',
   fps: false,
   bootAnimation: true,
   reduceMotion: false,
